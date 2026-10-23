@@ -23,14 +23,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab || !tab.id) throw new Error("No active tab found");
+      if (!tab || !tab.id) throw new Error("No active browser tab found");
 
       chrome.tabs.sendMessage(tab.id, { action: "INSPECT_PAGE" }, (response) => {
         btnInspect.disabled = false;
-        btnInspect.innerText = "🔍 Inspect Page Form";
+        btnInspect.innerText = "🔍 Inspect Form";
 
         if (!response || !response.fields || response.fields.length === 0) {
-          alert("No form input fields detected on this page.");
+          alert("No form inputs found on this page. Navigate to a supported form (e.g. http://localhost:3001/demo-form).");
           return;
         }
 
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     } catch (err) {
       btnInspect.disabled = false;
-      btnInspect.innerText = "🔍 Inspect Page Form";
+      btnInspect.innerText = "🔍 Inspect Form";
       alert("Could not inspect page: " + err.message);
     }
   });
@@ -73,8 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-      } catch (networkErr) {
-        // Fallback to port 3000 if 3001 isn't responding
+      } catch {
         res = await fetch("http://localhost:3000/api/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -92,12 +91,12 @@ document.addEventListener("DOMContentLoaded", () => {
       renderQualityGate(data.gateState, data.stats, data.summary);
       renderFindingsList(currentFindings);
 
-      // Trigger automatic highlight on page
+      // Trigger highlight on page
       sendHighlightToPage(currentFindings, data.gateState, data.stats?.blocking || 0);
       isHighlighted = true;
       btnHighlight.innerText = "Clear Highlights";
     } catch (err) {
-      alert("Tasdeeq engine error: " + err.message);
+      alert("Verification error: " + err.message);
     } finally {
       btnVerify.disabled = false;
       btnVerify.innerText = "🛡️ Verify Entries";
@@ -163,17 +162,17 @@ function renderQualityGate(gateState, stats, summary) {
     banner.classList.add("gate-banner--blocked");
     icon.innerText = "🛑";
     title.innerText = `Quality Gate: Blocked (${stats.blocking} Errors)`;
-    sub.innerText = "Unresolved rule violations intercept submission.";
+    sub.innerText = "Blocking errors prevent form submission.";
   } else if (gateState === "needs_review") {
     banner.classList.add("gate-banner--review");
     icon.innerText = "⚖️";
     title.innerText = `Quality Gate: Needs Review (${stats.warnings} Warnings)`;
-    sub.innerText = "Advisories detected. Review before releasing.";
+    sub.innerText = "Review warnings before release.";
   } else {
     banner.classList.add("gate-banner--ready");
     icon.innerText = "✅";
     title.innerText = "Quality Gate: Clear for Release";
-    sub.innerText = "All data validated against deterministic and context rules.";
+    sub.innerText = "All data conforms to verification rules.";
   }
 }
 
@@ -186,7 +185,7 @@ function renderFindingsList(findings) {
   listEl.innerHTML = "";
 
   if (findings.length === 0) {
-    listEl.innerHTML = `<div style="font-size:12px; color:#4ff7a9; padding:8px 0;">✓ No discrepancies found. All entries clean.</div>`;
+    listEl.innerHTML = `<div style="font-size:12px; color:#4ff7a9; padding:8px 0;">✓ All checks passed. Zero discrepancies detected.</div>`;
     return;
   }
 
@@ -197,11 +196,14 @@ function renderFindingsList(findings) {
       isBlocking ? "finding-card-mini--blocking" : "finding-card-mini--warning"
     }`;
 
+    const hasFixValue = !!f.expected_value || !!f.document_value;
+    const fixVal = f.document_value || f.expected_value || "";
+
     card.innerHTML = `
       <div class="finding-mini-top">
         <span>${f.label || f.field}</span>
-        <span style="color:${isBlocking ? "#f7574f" : "#f7a94f"}; font-size:10px;">
-          ${f.category.replace("_", " ").toUpperCase()}
+        <span style="color:${isBlocking ? "#f7574f" : "#f7a94f"}; font-size:10px; font-weight:700;">
+          ${f.category.replace(/_/g, " ").toUpperCase()}
         </span>
       </div>
       <div class="finding-mini-evidence">${f.evidence}</div>
@@ -209,6 +211,13 @@ function renderFindingsList(findings) {
         f.status === "open"
           ? `
         <div class="finding-mini-actions">
+          ${
+            hasFixValue
+              ? `<button class="btn btn--primary btn-mini" data-action="autofix" data-id="${f.finding_id}" data-field="${f.field}" data-val="${fixVal}">
+                  ✓ Fix on Form (${fixVal})
+                </button>`
+              : ""
+          }
           <button class="btn btn--secondary btn-mini" data-action="accept" data-id="${f.finding_id}">
             ✓ Accept
           </button>
@@ -221,12 +230,49 @@ function renderFindingsList(findings) {
       }
     `;
 
-    // Hook up quick resolve
+    // Hook up buttons
     card.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", async (e) => {
         const action = e.target.getAttribute("data-action");
         const findingId = e.target.getAttribute("data-id");
-        quickResolve(findingId, action === "accept" ? "resolved_accepted" : "dismissed");
+
+        if (action === "autofix") {
+          const field = e.target.getAttribute("data-field");
+          const val = e.target.getAttribute("data-val");
+          // Update in-page DOM input
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tab && tab.id) {
+            chrome.tabs.sendMessage(tab.id, { action: "AUTO_FIX_FIELD", field, value: val });
+          }
+          // Mark finding resolved
+          const finding = currentFindings.find((item) => item.finding_id === findingId);
+          if (finding) {
+            finding.status = "resolved_corrected";
+            finding.resolved_value = val;
+            finding.resolution_reason = "Auto-corrected via extension";
+          }
+          recalculateGate();
+        } else if (action === "accept") {
+          const note = prompt("Enter justification for accepting this exception:", "Approved by business reviewer");
+          if (note !== null) {
+            const finding = currentFindings.find((item) => item.finding_id === findingId);
+            if (finding) {
+              finding.status = "resolved_accepted";
+              finding.resolution_reason = note;
+            }
+            recalculateGate();
+          }
+        } else if (action === "dismiss") {
+          const note = prompt("Enter reason for dismissing finding:", "Reviewed and deemed non-critical");
+          if (note !== null) {
+            const finding = currentFindings.find((item) => item.finding_id === findingId);
+            if (finding) {
+              finding.status = "dismissed";
+              finding.resolution_reason = note;
+            }
+            recalculateGate();
+          }
+        }
       });
     });
 
@@ -234,24 +280,8 @@ function renderFindingsList(findings) {
   });
 }
 
-// ── Quick Resolve in Popup ───────────────────────────────────────────────────
-function quickResolve(findingId, resolution) {
-  const finding = currentFindings.find((f) => f.finding_id === findingId);
-  if (!finding) return;
-
-  const note = prompt(
-    resolution === "resolved_accepted"
-      ? "Enter justification for accepting this exception:"
-      : "Enter reason for dismissing finding:",
-    "Approved by reviewer in extension"
-  );
-
-  if (note === null) return; // User cancelled
-
-  finding.status = resolution;
-  finding.resolution_reason = note;
-
-  // Re-evaluate quality gate
+// ── Recalculate Gate & Update Highlights ─────────────────────────────────────
+function recalculateGate() {
   const openBlocking = currentFindings.filter(
     (f) => f.status === "open" && (f.severity === "blocking" || f.severity === "high")
   ).length;

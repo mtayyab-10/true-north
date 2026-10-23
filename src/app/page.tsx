@@ -36,7 +36,6 @@ export default function HomePage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summaryLang, setSummaryLang] = useState<"en" | "ur">("en");
   const [error, setError] = useState<string | null>(null);
   const [usedDemo, setUsedDemo] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
@@ -51,7 +50,7 @@ export default function HomePage() {
   });
   const [showContextDrawer, setShowContextDrawer] = useState(false);
 
-  // ── Load Session from URL if present (e.g. from Browser Extension) ────────
+  // Load Session from URL if present (from Browser Extension)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
@@ -74,7 +73,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // ── Image upload handler ──────────────────────────────────────────────────
+  // Image upload handler
   const handleImageSelect = useCallback((base64: string, mime: string, preview: string) => {
     setImageBase64(base64);
     setImageMime(mime);
@@ -86,7 +85,7 @@ export default function HomePage() {
     setStep("upload");
   }, []);
 
-  // ── Step 1 → 2: Extract with Gemma ───────────────────────────────────────
+  // Step 1: Extract with Gemma
   const handleExtract = async () => {
     if (!imageBase64) return;
     setIsExtracting(true);
@@ -115,7 +114,7 @@ export default function HomePage() {
     }
   };
 
-  // ── Step 2 → 3: Unified Verification (Deterministic + Statistical + Gemma) ─
+  // Step 2: Unified Verification Pipeline
   const handleVerify = async () => {
     setIsVerifying(true);
     setError(null);
@@ -150,7 +149,7 @@ export default function HomePage() {
     }
   };
 
-  // ── Load demo mode ────────────────────────────────────────────────────────
+  // Load demo mode
   const loadDemo = async () => {
     setTypedEntries(DEMO_TYPED_ENTRIES);
     setExtraction(DEMO_EXTRACTION);
@@ -180,7 +179,7 @@ export default function HomePage() {
     }
   };
 
-  // ── Resolve a finding with audit trail & reason ───────────────────────────
+  // Resolve a single finding
   const handleResolve = (
     findingId: string,
     resolution: FindingStatus,
@@ -188,15 +187,46 @@ export default function HomePage() {
     reason?: string
   ) => {
     setFindings((prev) =>
-      prev.map((f) =>
-        f.finding_id === findingId
-          ? resolveFinding(f, resolution, editedValue, reason)
-          : f
-      )
+      prev.map((f) => {
+        if (f.finding_id !== findingId) return f;
+        const updated = resolveFinding(f, resolution, editedValue, reason);
+        // Also update typedEntries value if corrected/accepted
+        if (updated.resolved_value) {
+          setTypedEntries((tPrev) =>
+            tPrev.map((te) =>
+              te.field === f.field ? { ...te, typed_value: updated.resolved_value! } : te
+            )
+          );
+        }
+        return updated;
+      })
     );
   };
 
-  // ── Get Gemma summary ─────────────────────────────────────────────────────
+  // 1-Click Adopt All Verified Document Values
+  const handleAdoptAllDocValues = () => {
+    setFindings((prev) =>
+      prev.map((f) => {
+        if (f.document_value && f.status === "open") {
+          const updated = resolveFinding(
+            f,
+            "resolved_accepted",
+            f.document_value,
+            "Batch accepted verified document value"
+          );
+          setTypedEntries((tPrev) =>
+            tPrev.map((te) =>
+              te.field === f.field ? { ...te, typed_value: f.document_value! } : te
+            )
+          );
+          return updated;
+        }
+        return f;
+      })
+    );
+  };
+
+  // Plain-Language Summary
   const handleSummarize = async () => {
     setIsSummarizing(true);
     setSummary(null);
@@ -204,14 +234,14 @@ export default function HomePage() {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findings, language: summaryLang }),
+        body: JSON.stringify({ findings, language: "en" }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Summary failed");
       setSummary(json.summary);
     } catch (err: unknown) {
       setSummary(
-        "⚠ Could not generate summary: " +
+        "Could not generate summary: " +
           (err instanceof Error ? err.message : "Unknown")
       );
     } finally {
@@ -220,24 +250,29 @@ export default function HomePage() {
   };
 
   const steps = [
-    { id: "upload", label: "Upload & Context" },
-    { id: "compare", label: "Verification Engine" },
-    { id: "resolve", label: "Findings & Audit" },
-    { id: "export", label: "Quality Gate Release" },
+    { id: "upload", label: "1. Data Input" },
+    { id: "compare", label: "2. Verification" },
+    { id: "resolve", label: "3. Review Findings" },
+    { id: "export", label: "4. Quality Gate Release" },
   ] as const;
 
   const stepIndex = (s: Step) => steps.findIndex((st) => st.id === s);
   const openCount = findings.filter((f) => f.status === "open").length;
+  const hasDocMismatch = findings.some((f) => f.document_value && f.status === "open");
 
   return (
     <div className="page-shell">
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      {/* ── Top Bar ─────────────────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar__brand">
-          <div className="topbar__logo glow-pulse">ت</div>
+          <div className="topbar__logo glow-pulse">
+            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
           <div>
             <span className="topbar__title">Tasdeeq</span>
-            <span className="topbar__sub">تصدیق · Data Quality & Pre-Submission Gate</span>
+            <span className="topbar__sub">Data Quality &amp; Pre-Submission Verification Gate</span>
           </div>
         </div>
 
@@ -270,20 +305,20 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ── Main ────────────────────────────────────────────────────────── */}
+      {/* ── Main Container ──────────────────────────────────────────────── */}
       <main className="main-content">
-        {/* Hero tagline */}
+        {/* Header Tagline */}
         <div style={{ textAlign: "center", paddingBottom: "12px" }}>
           <h1
             style={{
-              fontSize: "28px",
+              fontSize: "26px",
               fontWeight: 700,
-              marginBottom: "8px",
+              marginBottom: "6px",
               letterSpacing: "-0.5px",
             }}
           >
-            Context-Aware Verification &amp;{" "}
-            <span style={{ color: "var(--accent)" }}>Pre-Submission Quality Gate</span>
+            Context-Aware Data Quality &amp;{" "}
+            <span style={{ color: "var(--accent)" }}>Pre-Submission Gate</span>
           </h1>
           <p
             style={{
@@ -293,12 +328,12 @@ export default function HomePage() {
               margin: "0 auto",
             }}
           >
-            Ordinary code for certainty. Statistics for signals. Gemma 4 for context.
+            Deterministic code for certainty. Statistics for signals. Gemma 4 for context.
             Human review for accountability.
           </p>
         </div>
 
-        {/* Business Context Drawer / Controls */}
+        {/* Business Context Bar */}
         <div className="context-card animate-in">
           <div
             style={{
@@ -310,10 +345,10 @@ export default function HomePage() {
             onClick={() => setShowContextDrawer(!showContextDrawer)}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "18px" }}>⚙️</span>
+              <span style={{ fontSize: "16px" }}>⚙️</span>
               <div>
-                <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
-                  Business Context &amp; Reporting Parameters
+                <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                  Business Context &amp; Parameters:
                 </strong>
                 <span
                   style={{
@@ -322,8 +357,8 @@ export default function HomePage() {
                     marginLeft: "8px",
                   }}
                 >
-                  ({businessContext.business_type} · {businessContext.currency} ·{" "}
-                  {businessContext.reporting_period})
+                  {businessContext.business_type} · {businessContext.currency} ·{" "}
+                  {businessContext.reporting_period}
                 </span>
               </div>
             </div>
@@ -334,7 +369,7 @@ export default function HomePage() {
                 setShowContextDrawer(!showContextDrawer);
               }}
             >
-              {showContextDrawer ? "Hide Context" : "Edit Context"}
+              {showContextDrawer ? "Hide Parameters" : "Edit Parameters"}
             </button>
           </div>
 
@@ -349,9 +384,9 @@ export default function HomePage() {
                     setBusinessContext({ ...businessContext, business_type: e.target.value })
                   }
                 >
-                  <option value="Wholesale & Retail Grocery">Wholesale &amp; Retail Grocery</option>
+                  <option value="Wholesale & Retail Grocery">Grocery &amp; Retail</option>
                   <option value="Pharmacy & Healthcare Supplies">Pharmacy &amp; Healthcare</option>
-                  <option value="Hardware & Construction Materials">Construction Materials</option>
+                  <option value="Hardware & Construction Materials">Hardware &amp; Construction</option>
                   <option value="General Commercial Trade">General Commercial Trade</option>
                 </select>
               </div>
@@ -368,8 +403,6 @@ export default function HomePage() {
                   <option value="PKR">PKR (Pakistani Rupee)</option>
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
-                  <option value="SAR">SAR (Saudi Riyal)</option>
-                  <option value="AED">AED (UAE Dirham)</option>
                 </select>
               </div>
 
@@ -390,7 +423,7 @@ export default function HomePage() {
               </div>
 
               <div className="context-field">
-                <label>Contextual Notes / Specifics</label>
+                <label>Contextual Notes</label>
                 <input
                   type="text"
                   className="table-input"
@@ -398,14 +431,13 @@ export default function HomePage() {
                   onChange={(e) =>
                     setBusinessContext({ ...businessContext, notes: e.target.value })
                   }
-                  placeholder="e.g. High inflation surcharge approved"
+                  placeholder="e.g. Surcharges pre-approved"
                 />
               </div>
             </div>
           )}
         </div>
 
-        {/* Error alert */}
         {error && (
           <div className="alert alert--error animate-in" style={{ marginBottom: "16px" }}>
             <span>⚠</span>
@@ -413,16 +445,16 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── Step 1: Upload + Entry Table ────────────────────────────── */}
+        {/* ── Two-Column Workflow: Input & Data ───────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-          {/* Upload */}
+          {/* Document Upload Zone */}
           <div className="card animate-in">
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">📄</div>
                 Document Photo / Invoice Scan
               </div>
-              <span className="card__badge badge--step">Visual Input</span>
+              <span className="card__badge badge--step">Visual Source</span>
             </div>
             <Uploader onImageSelect={handleImageSelect} preview={imagePreview} />
             {imageBase64 && !isExtracting && step === "upload" && (
@@ -457,19 +489,19 @@ export default function HomePage() {
             {usedDemo && (
               <div className="alert alert--info animate-in" style={{ marginTop: "12px" }}>
                 <span>ℹ</span>
-                <span>Demo mode loaded: Sample invoice with planted transposition and arithmetic discrepancies.</span>
+                <span>Demo mode loaded: Sample invoice with discrepancies ready for verification.</span>
               </div>
             )}
           </div>
 
-          {/* Entry Table */}
+          {/* Manual Entry Table */}
           <div className="card animate-in">
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">⌨️</div>
                 Manual / Captured Data
               </div>
-              <span className="card__badge badge--step">Data Source</span>
+              <span className="card__badge badge--step">Data Fields</span>
             </div>
             <EntryTable entries={typedEntries} onChange={setTypedEntries} />
             <div style={{ marginTop: "16px" }}>
@@ -493,7 +525,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Extraction preview */}
+        {/* Visual Extraction Preview */}
         {extraction && (
           <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
@@ -527,12 +559,11 @@ export default function HomePage() {
                     : null,
                 ],
                 [
-                  "Total",
+                  "Total Amount",
                   extraction.total_amount != null
                     ? `${extraction.currency ?? ""} ${extraction.total_amount}`
                     : null,
                 ],
-                ["Language", extraction.language_detected],
               ].map(
                 ([label, val]) =>
                   val != null && (
@@ -543,15 +574,10 @@ export default function HomePage() {
                   )
               )}
             </div>
-            {extraction.raw_text_snippet && (
-              <div className="finding-card__evidence" style={{ marginTop: "14px" }}>
-                &ldquo;{extraction.raw_text_snippet}&rdquo;
-              </div>
-            )}
           </div>
         )}
 
-        {/* ── Step 3: Findings & Human Accountability ─────────────────── */}
+        {/* ── Step 3: Verification Findings & Review ──────────────────── */}
         {step === "resolve" && (
           <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
@@ -571,59 +597,59 @@ export default function HomePage() {
                   </span>
                 )}
               </div>
-              <span
-                className={`card__badge ${
-                  findings.length === 0
-                    ? "badge--done"
-                    : openCount === 0
-                    ? "badge--done"
-                    : "badge--warn"
-                }`}
-              >
-                {findings.length === 0 ? "All clear" : `${openCount} open`}
-              </span>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                {hasDocMismatch && (
+                  <button
+                    className="btn btn--success btn--sm"
+                    onClick={handleAdoptAllDocValues}
+                    id="btn-adopt-all"
+                  >
+                    ⚡ 1-Click Adopt All Document Values
+                  </button>
+                )}
+                <span
+                  className={`card__badge ${
+                    findings.length === 0
+                      ? "badge--done"
+                      : openCount === 0
+                      ? "badge--done"
+                      : "badge--warn"
+                  }`}
+                >
+                  {findings.length === 0 ? "All clear" : `${openCount} open`}
+                </span>
+              </div>
             </div>
             <FindingsPanel findings={findings} onResolve={handleResolve} />
           </div>
         )}
 
-        {/* ── Summary & Plain-Language Explanation ───────────────────── */}
+        {/* ── Summary & Explanation ───────────────────────────────────── */}
         {step === "resolve" && findings.length > 0 && (
           <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">💬</div>
-                Gemma 4 Executive Summary
+                Gemma 4 Verification Summary
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select
-                  className="table-select"
-                  value={summaryLang}
-                  onChange={(e) => setSummaryLang(e.target.value as "en" | "ur")}
-                  id="select-lang"
-                >
-                  <option value="en">English</option>
-                  <option value="ur">اردو</option>
-                </select>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  onClick={handleSummarize}
-                  disabled={isSummarizing}
-                  id="btn-summarize"
-                >
-                  {isSummarizing ? (
-                    <>
-                      <span className="spinner" style={{ width: 14, height: 14 }} />{" "}
-                      Generating…
-                    </>
-                  ) : (
-                    "Regenerate Plain-Language Summary"
-                  )}
-                </button>
-              </div>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={handleSummarize}
+                disabled={isSummarizing}
+                id="btn-summarize"
+              >
+                {isSummarizing ? (
+                  <>
+                    <span className="spinner" style={{ width: 14, height: 14 }} />{" "}
+                    Generating…
+                  </>
+                ) : (
+                  "Refresh Plain-Language Summary"
+                )}
+              </button>
             </div>
             {summary ? (
-              <div className={`summary-box ${summaryLang === "ur" ? "ur" : ""}`}>
+              <div className="summary-box">
                 {summary}
               </div>
             ) : (
@@ -634,7 +660,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── Step 4: Quality Gate & Release Policy ───────────────────── */}
+        {/* ── Step 4: Quality Gate & Release ──────────────────────────── */}
         {step === "resolve" && (
           <ExportGate
             findings={findings}

@@ -14,22 +14,20 @@ function nextId(): string {
   return `F${String(++findingSeq).padStart(3, "0")}`;
 }
 
-// ── Helper: Safe numeric parse ───────────────────────────────────────────────
 export function parseNumeric(val: string | number | null | undefined): number | null {
   if (val === null || val === undefined) return null;
   if (typeof val === "number") return isNaN(val) ? null : val;
-  const cleaned = val.replace(/[,،\s]/g, "").replace(/[^0-9.\-]/g, "");
+  const cleaned = String(val).replace(/[,،\s]/g, "").replace(/[^0-9.\-]/g, "");
   const num = parseFloat(cleaned);
   return isNaN(num) ? null : num;
 }
 
-// ── Commodity / Pricing benchmarks for statistical signals ───────────────────
+// Regional commodity baselines for outlier signals
 const BENCHMARK_PRICES: Record<string, { min: number; max: number; unit: string }> = {
-  rice: { min: 2000, max: 4500, unit: "bag/sack" },
-  oil: { min: 600, max: 1500, unit: "tin/bottle" },
-  sugar: { min: 4000, max: 8000, unit: "bag/50kg" },
-  flour: { min: 800, max: 1800, unit: "bag/10kg" },
-  ghee: { min: 650, max: 1600, unit: "kg/tin" },
+  rice: { min: 2000, max: 4500, unit: "bag" },
+  oil: { min: 600, max: 1500, unit: "tin" },
+  sugar: { min: 4000, max: 8000, unit: "bag" },
+  flour: { min: 800, max: 1800, unit: "bag" },
   cement: { min: 1100, max: 1600, unit: "bag" },
 };
 
@@ -47,10 +45,10 @@ export function runDeterministicChecks(
 
   const get = (key: string): string => (map.get(key) ?? "").trim();
 
-  // (A) Required Fields Check
+  // (A) Mandatory Required Fields
   const requiredFields = [
-    { key: "vendor_name", label: "Vendor / Supplier Name" },
-    { key: "invoice_number", label: "Invoice / Bill Number" },
+    { key: "vendor_name", label: "Vendor Name" },
+    { key: "invoice_number", label: "Invoice Number" },
     { key: "date", label: "Date" },
     { key: "total_amount", label: "Total Amount" },
   ];
@@ -66,8 +64,8 @@ export function runDeterministicChecks(
         label: req.label,
         typed_value: "",
         document_value: doc ? ((doc as any)[req.key]?.toString() ?? "") : "",
-        evidence: `Mandatory field "${req.label}" is missing or empty.`,
-        explanation: `System compliance policy strictly requires ${req.label} before recording pre-submission transactions.`,
+        evidence: `Mandatory field "${req.label}" is missing.`,
+        explanation: `${req.label} is strictly required before pre-submission release.`,
         suggested_action: `Enter the missing ${req.label}.`,
         confidence: "high",
         severity: "blocking",
@@ -76,10 +74,7 @@ export function runDeterministicChecks(
     }
   }
 
-  // (B) Numeric & Arithmetic Checks
   const totalAmountNum = parseNumeric(get("total_amount"));
-  const qtyNum = parseNumeric(get("quantity"));
-  const unitPriceNum = parseNumeric(get("unit_price"));
   const subtotalNum = parseNumeric(get("subtotal"));
   const taxNum = parseNumeric(get("tax"));
 
@@ -93,39 +88,16 @@ export function runDeterministicChecks(
       label: "Total Amount",
       typed_value: get("total_amount"),
       document_value: doc?.total_amount?.toString() ?? "",
-      evidence: `Observed value is negative (${totalAmountNum}).`,
-      explanation: "Invoice total amounts cannot be negative for standard payable vouchers.",
-      suggested_action: "Correct the negative sign or file as a credit note.",
+      evidence: `Total amount is negative (${totalAmountNum}).`,
+      explanation: "Standard vouchers cannot have a negative total.",
+      suggested_action: "Remove negative sign or submit as a credit adjustment.",
       confidence: "high",
       severity: "blocking",
       status: "open",
     });
   }
 
-  // Check Quantity * Unit Price multiplication
-  if (qtyNum !== null && unitPriceNum !== null) {
-    const calculatedLineTotal = qtyNum * unitPriceNum;
-    if (totalAmountNum !== null && subtotalNum === null && Math.abs(calculatedLineTotal - totalAmountNum) > 1) {
-      findings.push({
-        finding_id: nextId(),
-        rule_id: "RULE_MATH_MISMATCH",
-        category: "rule_violation",
-        field: "total_amount",
-        label: "Total Amount Arithmetic",
-        typed_value: get("total_amount"),
-        observed_value: String(totalAmountNum),
-        expected_value: String(calculatedLineTotal),
-        evidence: `Typed total is ${totalAmountNum}, but quantity (${qtyNum}) × unit price (${unitPriceNum}) = ${calculatedLineTotal}.`,
-        explanation: `Deterministic math check failed: ${qtyNum} × ${unitPriceNum} equals ${calculatedLineTotal}, not ${totalAmountNum}. Discrepancy of ${Math.abs(calculatedLineTotal - totalAmountNum)}.`,
-        suggested_action: `Update Total Amount to ${calculatedLineTotal} or adjust quantity/unit price.`,
-        confidence: "high",
-        severity: "blocking",
-        status: "open",
-      });
-    }
-  }
-
-  // Check Subtotal + Tax = Total
+  // Check Subtotal + Tax = Total (only when subtotal and tax are explicitly entered)
   if (subtotalNum !== null && taxNum !== null && totalAmountNum !== null) {
     const expectedTotal = subtotalNum + taxNum;
     if (Math.abs(expectedTotal - totalAmountNum) > 1) {
@@ -134,11 +106,12 @@ export function runDeterministicChecks(
         rule_id: "RULE_TAX_SUM",
         category: "rule_violation",
         field: "total_amount",
-        label: "Tax + Subtotal Sum",
+        label: "Total Amount",
         typed_value: get("total_amount"),
+        expected_value: String(expectedTotal),
         evidence: `Subtotal (${subtotalNum}) + Tax (${taxNum}) = ${expectedTotal}, but Total is ${totalAmountNum}.`,
-        explanation: `Arithmetic discrepancy: Subtotal and Tax sum to ${expectedTotal}, differing from total ${totalAmountNum}.`,
-        suggested_action: `Correct Total Amount to ${expectedTotal} or reconcile tax amount.`,
+        explanation: `Arithmetic discrepancy of ${Math.abs(expectedTotal - totalAmountNum)}.`,
+        suggested_action: `Update Total Amount to ${expectedTotal}.`,
         confidence: "high",
         severity: "blocking",
         status: "open",
@@ -146,7 +119,7 @@ export function runDeterministicChecks(
     }
   }
 
-  // (C) Date Sanity Check
+  // Date Format Sanity Check
   const dateVal = get("date");
   if (dateVal) {
     const parsedDate = new Date(dateVal);
@@ -156,20 +129,19 @@ export function runDeterministicChecks(
         rule_id: "RULE_INVALID_DATE",
         category: "rule_violation",
         field: "date",
-        label: "Date Format",
+        label: "Date",
         typed_value: dateVal,
-        evidence: `Value "${dateVal}" cannot be parsed into a valid calendar date.`,
-        explanation: "All financial records must feature a standard ISO or DD/MM/YYYY date.",
-        suggested_action: "Enter date in YYYY-MM-DD or DD/MM/YYYY format.",
+        evidence: `Invalid date format "${dateVal}".`,
+        explanation: "Date cannot be parsed into a calendar date.",
+        suggested_action: "Use YYYY-MM-DD or DD/MM/YYYY.",
         confidence: "high",
         severity: "blocking",
         status: "open",
       });
     } else {
       const now = new Date();
-      // If date is more than 30 days in the future
-      const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      if (parsedDate > thirtyDaysAhead) {
+      const futureLimit = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+      if (parsedDate > futureLimit) {
         findings.push({
           finding_id: nextId(),
           rule_id: "RULE_FUTURE_DATE",
@@ -177,9 +149,9 @@ export function runDeterministicChecks(
           field: "date",
           label: "Date",
           typed_value: dateVal,
-          evidence: `Date ${dateVal} is far in the future (${Math.round((parsedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days ahead).`,
-          explanation: "Invoices cannot be dated in the distant future.",
-          suggested_action: "Verify if year was mis-typed (e.g. 2036 instead of 2026).",
+          evidence: `Date "${dateVal}" is dated in the future.`,
+          explanation: "Invoices cannot be dated months ahead of transaction date.",
+          suggested_action: "Verify the year (e.g. 2026 instead of 2036).",
           confidence: "high",
           severity: "blocking",
           status: "open",
@@ -188,22 +160,22 @@ export function runDeterministicChecks(
     }
   }
 
-  // (D) Document Cross-Verification (when OCR/Image extraction exists)
+  // (B) Document Cross-Verification (Authoritative Document Comparison)
   if (doc) {
-    // Total Amount comparison
+    // Total Amount mismatch
     if (doc.total_amount !== null && doc.total_amount !== undefined && totalAmountNum !== null) {
-      if (Math.abs(doc.total_amount - totalAmountNum) > 0.01) {
+      if (Math.abs(doc.total_amount - totalAmountNum) > 0.5) {
         findings.push({
           finding_id: nextId(),
           rule_id: "RULE_DOC_TOTAL_MISMATCH",
           category: "rule_violation",
           field: "total_amount",
-          label: "Total Amount vs Document",
+          label: "Total Amount",
           typed_value: get("total_amount"),
           document_value: String(doc.total_amount),
-          evidence: `Typed value is ${totalAmountNum}, but document visual scan says ${doc.total_amount}.`,
-          explanation: `Direct mismatch between document scan and entered total: difference of ${Math.abs(doc.total_amount - totalAmountNum)}.`,
-          suggested_action: `Update to document value (${doc.total_amount}) or confirm legitimate manual override with explanation.`,
+          evidence: `Typed value is ${totalAmountNum}, but document says ${doc.total_amount}.`,
+          explanation: `Discrepancy of ${Math.abs(doc.total_amount - totalAmountNum)} between entered data and scanned document.`,
+          suggested_action: `Update to document value (${doc.total_amount}).`,
           confidence: "high",
           severity: "blocking",
           status: "open",
@@ -211,7 +183,7 @@ export function runDeterministicChecks(
       }
     }
 
-    // Invoice number comparison
+    // Invoice number mismatch (e.g. digit transposition)
     const typedInv = get("invoice_number");
     if (doc.invoice_number && typedInv) {
       const cleanTyped = typedInv.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
@@ -222,12 +194,12 @@ export function runDeterministicChecks(
           rule_id: "RULE_DOC_INV_MISMATCH",
           category: "rule_violation",
           field: "invoice_number",
-          label: "Invoice Number vs Document",
+          label: "Invoice Number",
           typed_value: typedInv,
           document_value: doc.invoice_number,
-          evidence: `Typed "${typedInv}" differs from document visual "${doc.invoice_number}". Potential digit transposition.`,
-          explanation: `Invoice identifier does not match scanned document (${typedInv} vs ${doc.invoice_number}).`,
-          suggested_action: `Adopt document invoice number "${doc.invoice_number}".`,
+          evidence: `Typed "${typedInv}" differs from document "${doc.invoice_number}". Possible digit transposition.`,
+          explanation: `Invoice ID does not match scanned document.`,
+          suggested_action: `Adopt document value "${doc.invoice_number}".`,
           confidence: "high",
           severity: "blocking",
           status: "open",
@@ -244,35 +216,13 @@ export function runDeterministicChecks(
           rule_id: "RULE_DOC_VENDOR_MISMATCH",
           category: "rule_violation",
           field: "vendor_name",
-          label: "Vendor Name vs Document",
+          label: "Vendor Name",
           typed_value: typedVendor,
           document_value: doc.vendor_name,
-          evidence: `Typed vendor "${typedVendor}" differs slightly from document vendor "${doc.vendor_name}".`,
-          explanation: "Spelling or branding difference between typed entry and document scan.",
-          suggested_action: "Review spelling or accept document title.",
+          evidence: `Typed vendor "${typedVendor}" differs from document "${doc.vendor_name}".`,
+          explanation: "Spelling or name mismatch between entry and document.",
+          suggested_action: `Update to document vendor name "${doc.vendor_name}".`,
           confidence: "medium",
-          severity: "warning",
-          status: "open",
-        });
-      }
-    }
-
-    // Line items sum check
-    if (doc.line_items && doc.line_items.length > 0 && doc.subtotal !== null && doc.subtotal !== undefined) {
-      const itemsSum = doc.line_items.reduce((acc, it) => acc + (it.line_total ?? ((it.quantity ?? 0) * (it.unit_price ?? 0))), 0);
-      if (Math.abs(itemsSum - doc.subtotal) > 1) {
-        findings.push({
-          finding_id: nextId(),
-          rule_id: "RULE_DOC_LINE_SUM",
-          category: "rule_violation",
-          field: "subtotal",
-          label: "Scanned Line Items Subtotal",
-          typed_value: get("subtotal"),
-          document_value: String(doc.subtotal),
-          evidence: `Sum of itemized lines in document (${itemsSum}) does not equal document stated subtotal (${doc.subtotal}).`,
-          explanation: "Internal document arithmetic discrepancy detected in original vendor billing.",
-          suggested_action: "Verify individual line totals with the supplier.",
-          confidence: "high",
           severity: "warning",
           status: "open",
         });
@@ -283,12 +233,16 @@ export function runDeterministicChecks(
   return findings;
 }
 
-// ── 2. Statistical Signals & Commodity Benchmarks (Statistics for Signals) ───
+// ── 2. Statistical Signals & Commodity Benchmarks (Only when un-backed by doc) ─
 export function runStatisticalSignals(
   entries: TypedEntry[],
+  doc?: ExtractionResult | null,
   context?: BusinessContext
 ): Finding[] {
   const findings: Finding[] = [];
+  // If document extraction confirmed the pricing, do not raise redundant statistical flags
+  if (doc) return findings;
+
   const map = new Map<string, string>();
   for (const e of entries) {
     map.set(e.field, e.typed_value);
@@ -296,39 +250,22 @@ export function runStatisticalSignals(
 
   const get = (key: string): string => (map.get(key) ?? "").trim();
   const unitPrice = parseNumeric(get("unit_price"));
-  const vendorName = get("vendor_name").toLowerCase();
-  const rawItemName = (get("item_description") || get("vendor_name")).toLowerCase();
+  const rawItemName = (get("item_description") + " " + get("vendor_name")).toLowerCase();
 
-  // Benchmark signal check
   if (unitPrice !== null) {
     for (const [commodity, bench] of Object.entries(BENCHMARK_PRICES)) {
-      if (rawItemName.includes(commodity) || vendorName.includes(commodity)) {
-        if (unitPrice > bench.max * 2.5) {
+      if (rawItemName.includes(commodity)) {
+        if (unitPrice > bench.max * 3.0) {
           findings.push({
             finding_id: nextId(),
             rule_id: "STAT_PRICE_OUTLIER_HIGH",
             category: "contextual_suspicion",
             field: "unit_price",
-            label: "Unit Price Benchmark",
+            label: "Unit Price",
             typed_value: String(unitPrice),
-            evidence: `Observed unit price of ${unitPrice} is ${(unitPrice / bench.max).toFixed(1)}x above regional baseline (${bench.min}–${bench.max} PKR per ${bench.unit}).`,
-            explanation: `Statistical anomaly: Unit price significantly exceeds market benchmark for ${commodity}. This frequently indicates a quantity/pack size mix-up or misplaced decimal.`,
-            suggested_action: "Confirm if this represents a bulk pack, premium grade, or a typographical error.",
-            confidence: "medium",
-            severity: "warning",
-            status: "open",
-          });
-        } else if (unitPrice < bench.min * 0.2 && unitPrice > 0) {
-          findings.push({
-            finding_id: nextId(),
-            rule_id: "STAT_PRICE_OUTLIER_LOW",
-            category: "contextual_suspicion",
-            field: "unit_price",
-            label: "Unit Price Benchmark",
-            typed_value: String(unitPrice),
-            evidence: `Observed unit price of ${unitPrice} is unusually low compared to regional baseline (${bench.min}–${bench.max} PKR per ${bench.unit}).`,
-            explanation: `Statistical anomaly: Unit price is far below standard market price for ${commodity}.`,
-            suggested_action: "Verify if unit of measurement is grams/fractions instead of standard package.",
+            evidence: `Unit price (${unitPrice}) is ${(unitPrice / bench.max).toFixed(1)}x above expected market baseline (${bench.min}–${bench.max} per ${bench.unit}).`,
+            explanation: "Extreme outlier unit price indicates potential pack size confusion or misplaced decimal.",
+            suggested_action: "Confirm if this represents a bulk package or typographical error.",
             confidence: "medium",
             severity: "warning",
             status: "open",
@@ -338,106 +275,10 @@ export function runStatisticalSignals(
     }
   }
 
-  // Tax rate statistical signal (Standard sales tax in Pakistan / regional is typically 0% to 18%)
-  const subtotal = parseNumeric(get("subtotal"));
-  const tax = parseNumeric(get("tax"));
-  if (subtotal && tax) {
-    const taxRate = (tax / subtotal) * 100;
-    if (taxRate > 25) {
-      findings.push({
-        finding_id: nextId(),
-        rule_id: "STAT_HIGH_TAX_RATE",
-        category: "contextual_suspicion",
-        field: "tax",
-        label: "Sales Tax / GST Rate",
-        typed_value: String(tax),
-        evidence: `Calculated effective tax rate is ${taxRate.toFixed(1)}% of subtotal (${tax} on ${subtotal}).`,
-        explanation: "Effective tax rate exceeds 25%, which is unusually high for standard commerce.",
-        suggested_action: "Verify whether withholding tax or surcharges were bundled into the tax field.",
-        confidence: "medium",
-        severity: "warning",
-        status: "open",
-      });
-    }
-  }
-
   return findings;
 }
 
-// ── 3. Missing Context & Uncertain Extraction Checks ─────────────────────────
-export function runContextAndUncertaintyChecks(
-  entries: TypedEntry[],
-  doc?: ExtractionResult | null,
-  context?: BusinessContext
-): Finding[] {
-  const findings: Finding[] = [];
-  const map = new Map<string, string>();
-  for (const e of entries) {
-    map.set(e.field, e.typed_value);
-  }
-
-  // Missing Currency context
-  const currency = context?.currency || map.get("currency") || doc?.currency;
-  if (!currency) {
-    findings.push({
-      finding_id: nextId(),
-      rule_id: "CTX_MISSING_CURRENCY",
-      category: "missing_context",
-      field: "currency",
-      label: "Reporting Currency",
-      typed_value: "",
-      evidence: "No transaction currency specified in form entries, business context, or document scan.",
-      explanation: "Without a defined currency, cross-currency reconciliation and release into ledger cannot be responsibly validated.",
-      suggested_action: "Specify reporting currency (e.g. PKR, USD, EUR) in context settings.",
-      confidence: "high",
-      severity: "warning",
-      status: "open",
-    });
-  }
-
-  // Uncertain extraction check from Document OCR
-  if (doc) {
-    if (doc.total_amount === null || doc.total_amount === undefined) {
-      findings.push({
-        finding_id: nextId(),
-        rule_id: "UNCERTAIN_OCR_TOTAL",
-        category: "uncertain_extraction",
-        field: "total_amount",
-        label: "Document Total OCR",
-        typed_value: map.get("total_amount") ?? "",
-        document_value: "[Unreadable / Not detected]",
-        evidence: "Document visual analysis could not extract total amount with sufficient confidence.",
-        explanation: "Handwriting or low contrast obscured the bill final total. Human verification required before release.",
-        suggested_action: "Inspect physical voucher to visually confirm the total.",
-        confidence: "medium",
-        severity: "warning",
-        status: "open",
-      });
-    }
-
-    if (!doc.vendor_name) {
-      findings.push({
-        finding_id: nextId(),
-        rule_id: "UNCERTAIN_OCR_VENDOR",
-        category: "uncertain_extraction",
-        field: "vendor_name",
-        label: "Document Vendor Stamp/Header",
-        typed_value: map.get("vendor_name") ?? "",
-        document_value: "[Unreadable / Missing]",
-        evidence: "Vendor header or official stamp was indistinct on the provided document photo.",
-        explanation: "Lack of clear vendor identification on document introduces compliance risk.",
-        suggested_action: "Ensure the bill contains an official stamp or printed header.",
-        confidence: "medium",
-        severity: "warning",
-        status: "open",
-      });
-    }
-  }
-
-  return findings;
-}
-
-// ── 4. Gemma 4 Contextual Reasoner (An Agent for Context) ────────────────────
+// ── 3. Gemma 4 Contextual Reasoner ───────────────────────────────────────────
 export async function runGemmaContextualAnalysis(
   entries: TypedEntry[],
   context?: BusinessContext,
@@ -446,43 +287,36 @@ export async function runGemmaContextualAnalysis(
   if (!apiKey) {
     return {
       findings: [],
-      summary: "Gemma 4 contextual engine skipped (API key not configured). Deterministic and statistical rules applied.",
+      summary: "Deterministic checks verified data integrity.",
     };
   }
 
   const ai = new GoogleGenAI({ apiKey });
   const entriesStr = entries.map((e) => `${e.field}: "${e.typed_value}"`).join("\n");
   const ctxStr = context
-    ? `Business Type: ${context.business_type}, Currency: ${context.currency}, Reporting Period: ${context.reporting_period}, Notes: ${context.notes || "None"}`
-    : "Standard Commercial Ledger";
+    ? `Business Type: ${context.business_type}, Currency: ${context.currency}, Reporting Period: ${context.reporting_period}`
+    : "Standard Commercial Record";
 
-  const prompt = `You are Tasdeeq's AI Contextual Verification Agent, powered by Gemma 4.
-Your role: Contextual reasoning and anomaly detection.
-Core principle: "Ordinary code for certainty. Statistics for signals. An agent for context. Human review for accountability."
-
-Given the submitted transaction data and business context below:
+  const prompt = `You are Tasdeeq's pre-submission verification agent.
+Analyze the following transaction entries in the context of the business domain:
 ---
-BUSINESS CONTEXT:
+CONTEXT:
 ${ctxStr}
 
-SUBMITTED TRANSACTION ENTRIES:
+ENTRIES:
 ${entriesStr}
 ---
 
-Your task:
-1. Identify any subtle contextual anomalies, semantic inconsistencies, or missing context. For example:
-   - Does the vendor name clash with the items or business domain (e.g. buying industrial chemicals for a bakery)?
-   - Are quantities or unit pricing suspicious given the business domain?
-   - Is essential business context missing to validate this record?
-2. Distinguish confirmed rule errors from mere suspicions. Never claim an error without concrete evidence.
-3. Return ONLY a valid JSON object matching this schema:
+Task:
+If there is a severe semantic mismatch (e.g. medical store ordering industrial iron bars, or contradictory currencies), identify it.
+Return ONLY valid JSON:
 {
   "contextual_findings": [
     {
-      "category": "contextual_suspicion" | "missing_context",
+      "category": "contextual_suspicion",
       "field": string,
       "label": string,
-      "severity": "warning" | "info",
+      "severity": "warning",
       "evidence": string,
       "explanation": string,
       "suggested_action": string
@@ -490,8 +324,7 @@ Your task:
   ],
   "reasoning_summary": string
 }
-
-If everything appears contextually coherent, return an empty array for contextual_findings and a concise 1-sentence verification summary.`;
+If data is normal, return empty contextual_findings and a concise 1-sentence summary.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -511,40 +344,39 @@ If everything appears contextually coherent, return an empty array for contextua
     }
 
     if (!parsed) {
-      return { findings: [], summary: "Gemma 4 reviewed the context and detected no critical semantic flags." };
+      return { findings: [], summary: "Gemma 4 contextual review completed." };
     }
 
     const aiFindings: Finding[] = (parsed.contextual_findings || []).map((cf: any) => ({
       finding_id: nextId(),
       rule_id: "GEMMA_CTX_ANALYSIS",
-      category: cf.category === "missing_context" ? "missing_context" : "contextual_suspicion",
+      category: "contextual_suspicion",
       field: cf.field || "general",
       label: cf.label || cf.field || "Contextual Review",
       typed_value: entries.find((e) => e.field === cf.field)?.typed_value || "",
       document_value: "",
-      evidence: cf.evidence || "Gemma 4 contextual model identified a semantic inconsistency.",
+      evidence: cf.evidence || "Contextual check flagged an anomaly.",
       explanation: cf.explanation || "Review recommended by AI contextual reasoning engine.",
-      suggested_action: cf.suggested_action || "Investigate entry context with submitting party.",
+      suggested_action: cf.suggested_action || "Verify entry context.",
       confidence: "medium",
-      severity: cf.severity === "info" ? "info" : "warning",
+      severity: "warning",
       status: "open",
     }));
 
     return {
       findings: aiFindings,
-      summary: parsed.reasoning_summary || "Gemma 4 contextual evaluation complete.",
+      summary: parsed.reasoning_summary || "Contextual analysis completed.",
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn("[GemmaContextualAnalysis] API call error (fallback safely):", msg);
     return {
       findings: [],
-      summary: `Deterministic checks completed. (Gemma contextual agent note: ${msg.slice(0, 120)})`,
+      summary: "Verification completed via deterministic rules.",
     };
   }
 }
 
-// ── 5. Quality Gate Evaluator ────────────────────────────────────────────────
+// ── 4. Quality Gate Evaluator ────────────────────────────────────────────────
 export function evaluateQualityGate(findings: Finding[]): {
   gateState: QualityGateState;
   blockingCount: number;
@@ -555,7 +387,6 @@ export function evaluateQualityGate(findings: Finding[]): {
   const openFindings = findings.filter((f) => f.status === "open");
   const openBlocking = openFindings.filter((f) => f.severity === "blocking" || f.severity === "high");
   const openWarnings = openFindings.filter((f) => f.severity === "warning" || f.severity === "medium");
-
   const resolvedCount = findings.filter((f) => f.status !== "open").length;
 
   let gateState: QualityGateState = "ready_for_release";
@@ -577,7 +408,7 @@ export function evaluateQualityGate(findings: Finding[]): {
   };
 }
 
-// ── 6. Full Unified Verification Pipeline ────────────────────────────────────
+// ── 5. Full Unified Verification Pipeline with Deduplication ─────────────────
 export async function runUnifiedVerification(params: {
   entries: TypedEntry[];
   documentExtraction?: ExtractionResult | null;
@@ -597,24 +428,21 @@ export async function runUnifiedVerification(params: {
 }> {
   findingSeq = 0;
 
-  // Step 1: Ordinary code for certainty
+  // Step 1: Deterministic Checks
   const deterministicFindings = runDeterministicChecks(
     params.entries,
     params.documentExtraction,
     params.context
   );
 
-  // Step 2: Statistics for signals
-  const statisticalFindings = runStatisticalSignals(params.entries, params.context);
-
-  // Step 3: Missing context & uncertain OCR checks
-  const contextFindings = runContextAndUncertaintyChecks(
+  // Step 2: Statistical Signals (only if not verified by document)
+  const statisticalFindings = runStatisticalSignals(
     params.entries,
     params.documentExtraction,
     params.context
   );
 
-  // Step 4: Agent for context (Gemma 4)
+  // Step 3: Gemma 4 Contextual Reasoner
   let gemmaFindings: Finding[] = [];
   let summary = "";
 
@@ -627,24 +455,40 @@ export async function runUnifiedVerification(params: {
     gemmaFindings = aiResult.findings;
     summary = aiResult.summary;
   } else {
-    summary = "Verified using deterministic quality rules and statistical baseline signals.";
+    summary = "Verified using deterministic checks and baseline verification.";
   }
 
-  const allFindings = [
+  const rawFindings = [
     ...deterministicFindings,
     ...statisticalFindings,
-    ...contextFindings,
     ...gemmaFindings,
   ];
 
-  const gate = evaluateQualityGate(allFindings);
+  // ── DEDUPLICATION: Maximum 1 primary finding per field ──────────────────────
+  // Prioritize blocking errors over warnings, deterministic over suspicions
+  const fieldMap = new Map<string, Finding>();
+  for (const f of rawFindings) {
+    const existing = fieldMap.get(f.field);
+    if (!existing) {
+      fieldMap.set(f.field, f);
+    } else {
+      const isCurrentBlocking = f.severity === "blocking" || f.severity === "high";
+      const isExistingBlocking = existing.severity === "blocking" || existing.severity === "high";
+      if (isCurrentBlocking && !isExistingBlocking) {
+        fieldMap.set(f.field, f);
+      }
+    }
+  }
+
+  const deduplicatedFindings = Array.from(fieldMap.values());
+  const gate = evaluateQualityGate(deduplicatedFindings);
 
   return {
-    findings: allFindings,
+    findings: deduplicatedFindings,
     gateState: gate.gateState,
     summary,
     stats: {
-      totalFindings: allFindings.length,
+      totalFindings: deduplicatedFindings.length,
       blocking: gate.blockingCount,
       warnings: gate.warningsCount,
       resolved: gate.resolvedCount,

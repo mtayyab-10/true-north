@@ -173,8 +173,8 @@ export default function ControlledDemoFormPage() {
             </svg>
           </div>
           <div>
-            <div className="topbar__title">Tasdeeq <span className="ur">تصدیق</span></div>
-            <div className="topbar__sub">Controlled Form & Pre-Submission Guard Demo</div>
+            <div className="topbar__title">Tasdeeq</div>
+            <div className="topbar__sub">Controlled Form &amp; Pre-Submission Guard Demo</div>
           </div>
         </div>
 

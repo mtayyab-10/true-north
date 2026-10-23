@@ -7,12 +7,12 @@
 </head>
 <body>
   <div class="popup-container">
-    <!-- Header -->
+    <!-- Header (Clean English, No Urdu) -->
     <header class="header">
       <div class="header__brand">
-        <div class="logo">ت</div>
+        <div class="logo">T</div>
         <div>
-          <div class="title">Tasdeeq <span class="title-ur">تصدیق</span></div>
+          <div class="title">Tasdeeq</div>
           <div class="subtitle">Pre-Submission Quality Gate</div>
         </div>
       </div>
@@ -22,12 +22,12 @@
     <!-- Context Bar -->
     <div class="context-bar">
       <div class="context-select-group">
-        <label>Domain</label>
+        <label>Business Domain</label>
         <select id="ctx-business-type">
-          <option value="Wholesale & Retail Grocery">Grocery</option>
-          <option value="Pharmacy & Healthcare Supplies">Pharmacy</option>
-          <option value="Hardware & Construction Materials">Hardware</option>
-          <option value="General Commercial Trade">General</option>
+          <option value="Wholesale & Retail Grocery">Grocery & Retail</option>
+          <option value="Pharmacy & Healthcare Supplies">Pharmacy & Medical</option>
+          <option value="Hardware & Construction Materials">Hardware & Trade</option>
+          <option value="General Commercial Trade">General Commercial</option>
         </select>
       </div>
       <div class="context-select-group">
@@ -43,7 +43,7 @@
     <!-- Main Actions -->
     <div class="action-bar">
       <button id="btn-inspect" class="btn btn--secondary btn--sm">
-        🔍 Inspect Page Form
+        🔍 Inspect Form
       </button>
       <button id="btn-verify" class="btn btn--primary btn--sm" disabled>
         🛡️ Verify Entries
@@ -59,7 +59,7 @@
       </div>
     </div>
 
-    <!-- Inspected Fields Accordion -->
+    <!-- Captured Fields Accordion -->
     <div id="fields-section" class="section section--hidden">
       <div class="section-title">
         <span>Captured Fields (<span id="fields-count">0</span>)</span>
@@ -79,7 +79,7 @@
     <!-- Footer / Workspace Link -->
     <footer class="footer">
       <button id="btn-open-workspace" class="btn btn--ghost btn--full">
-        ↗ Open in Full Tasdeeq Workspace
+        ↗ Open in Full Web Workspace
       </button>
     </footer>
   </div>

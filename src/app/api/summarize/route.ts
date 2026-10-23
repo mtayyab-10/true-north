@@ -1,4 +1,4 @@
-﻿/**
+/**
  * POST /api/summarize
  * Takes resolved/open findings and asks Gemma 4 to write a
  * short plain-language summary in the requested language (en or ur).
@@ -38,13 +38,8 @@ export async function POST(req: NextRequest) {
     )
     .join("\n");
 
-  const langInstruction =
-    language === "ur"
-      ? "Write your response in Urdu (Roman Urdu is also acceptable)."
-      : "Write your response in clear, simple English.";
-
-  const prompt = `You are a helpful assistant for small business staff.
-${langInstruction}
+  const prompt = `You are a data quality verification assistant.
+Write your response in clear, concise English.
 
 The following discrepancies were found between typed entries and what was read from the document:
 

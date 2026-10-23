@@ -1,5 +1,6 @@
 // ══════════════════════════════════════════════
 // TASDEEQ BROWSER EXTENSION — CONTENT SCRIPT
+// Plain JavaScript (Strictly no TypeScript syntax)
 // ══════════════════════════════════════════════
 
 let currentGuardState = {
@@ -20,7 +21,7 @@ function extractFormFields() {
     // Determine label
     let label = "";
     if (el.id) {
-      const labelEl = document.querySelector(`label[for="${el.id}"]`);
+      const labelEl = document.querySelector("label[for='" + el.id + "']");
       if (labelEl) label = labelEl.innerText.trim();
     }
     if (!label) {
@@ -40,8 +41,7 @@ function extractFormFields() {
     }
 
     // Determine normalized field key
-    let field = el.name || el.id || `field_${index}`;
-    // Normalize field key if it has common patterns
+    let field = el.name || el.id || ("field_" + index);
     const lower = (field + " " + label).toLowerCase();
     if (lower.includes("vendor") || lower.includes("supplier") || lower.includes("shop")) field = "vendor_name";
     else if (lower.includes("invoice") || lower.includes("voucher") || lower.includes("bill")) field = "invoice_number";
@@ -52,15 +52,16 @@ function extractFormFields() {
     else if (lower.includes("qty") || lower.includes("quantity")) field = "quantity";
     else if (lower.includes("unit price") || lower.includes("rate") || lower.includes("price")) field = "unit_price";
     else if (lower.includes("currency")) field = "currency";
+    else if (lower.includes("item") || lower.includes("desc") || lower.includes("product")) field = "item_description";
 
-    const typedVal = (el as HTMLInputElement).value || "";
+    const typedVal = el.value || "";
 
     extracted.push({
-      id: el.id || `tasdeeq_elem_${index}`,
-      field,
+      id: el.id || ("tasdeeq_elem_" + index),
+      field: field,
       label: label || field,
       typed_value: typedVal,
-      field_type: (el as HTMLInputElement).type || el.tagName.toLowerCase(),
+      field_type: el.type || el.tagName.toLowerCase(),
     });
   });
 
@@ -75,21 +76,21 @@ function applyHighlights(findings) {
     if (f.status !== "open") return;
 
     // Find matching DOM elements
-    const matches = document.querySelectorAll(
-      `input[name="${f.field}"], input#${f.field}, input#field-${f.field}, [name*="${f.field}" i]`
-    );
+    const selector = "input[name='" + f.field + "'], input#" + f.field + ", input#field-" + f.field + ", [name*='" + f.field + "']";
+    const matches = document.querySelectorAll(selector);
 
     matches.forEach((el) => {
       const isBlocking = f.severity === "blocking" || f.severity === "high";
       el.classList.add(isBlocking ? "tasdeeq-highlight-blocking" : "tasdeeq-highlight-warning");
 
-      // Create floating badge
-      const badge = document.createElement("div");
-      badge.className = `tasdeeq-field-badge ${isBlocking ? "tasdeeq-field-badge--blocking" : "tasdeeq-field-badge--warning"}`;
-      badge.setAttribute("data-tasdeeq-badge", "true");
-      badge.innerHTML = `<span>${isBlocking ? "🛑" : "⚠️"}</span> <span>${f.evidence || f.label || "Issue detected"}</span>`;
-
-      el.parentNode?.insertBefore(badge, el.nextSibling);
+      // Create floating badge if not already added
+      if (!el.nextElementSibling || !el.nextElementSibling.classList.contains("tasdeeq-field-badge")) {
+        const badge = document.createElement("div");
+        badge.className = "tasdeeq-field-badge " + (isBlocking ? "tasdeeq-field-badge--blocking" : "tasdeeq-field-badge--warning");
+        badge.setAttribute("data-tasdeeq-badge", "true");
+        badge.innerHTML = "<span>" + (isBlocking ? "🛑" : "⚠️") + "</span> <span>" + (f.evidence || f.label || "Issue detected") + "</span>";
+        el.parentNode.insertBefore(badge, el.nextSibling);
+      }
     });
   });
 }
@@ -101,7 +102,7 @@ function clearHighlights() {
   document.querySelectorAll("[data-tasdeeq-badge='true']").forEach((b) => b.remove());
 }
 
-// ── Pre-Submission Interception Guard ─────────────────────────────────────────
+// ── In-Page Pre-Submission Interception Guard ─────────────────────────────────
 function showGuardToast(blockingCount, sampleEvidence) {
   const existing = document.getElementById("tasdeeq-guard-toast");
   if (existing) existing.remove();
@@ -109,24 +110,27 @@ function showGuardToast(blockingCount, sampleEvidence) {
   const toast = document.createElement("div");
   toast.id = "tasdeeq-guard-toast";
   toast.className = "tasdeeq-guard-toast";
-  toast.innerHTML = `
-    <div class="tasdeeq-guard-toast__title">
-      <span>🛑</span> Tasdeeq Pre-Submission Guard
-    </div>
-    <div class="tasdeeq-guard-toast__body">
-      Submission was intercepted. <strong>${blockingCount} blocking error(s)</strong> must be resolved before this voucher can be released.
-      <br/><br/>
-      <em>${sampleEvidence || "Review discrepancies in the Tasdeeq extension popup."}</em>
-    </div>
-    <div style="display:flex; justify-content: flex-end; gap: 8px;">
-      <button class="tasdeeq-guard-toast__btn" id="tasdeeq-toast-dismiss">Dismiss</button>
-    </div>
-  `;
+  toast.innerHTML = [
+    '<div class="tasdeeq-guard-toast__title">',
+    '  <span>🛑</span> Tasdeeq Pre-Submission Guard',
+    '</div>',
+    '<div class="tasdeeq-guard-toast__body">',
+    '  Submission blocked: <strong>' + blockingCount + ' blocking issue(s)</strong> must be resolved before this form can be submitted.',
+    '  <br/><br/>',
+    '  <em>' + (sampleEvidence || "Review flagged fields highlighted on the page.") + '</em>',
+    '</div>',
+    '<div style="display:flex; justify-content: flex-end; gap: 8px;">',
+    '  <button class="tasdeeq-guard-toast__btn" id="tasdeeq-toast-dismiss">Review &amp; Fix</button>',
+    '</div>'
+  ].join("\n");
 
   document.body.appendChild(toast);
-  document.getElementById("tasdeeq-toast-dismiss")?.addEventListener("click", () => {
-    toast.remove();
-  });
+  const dismissBtn = document.getElementById("tasdeeq-toast-dismiss");
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", () => {
+      toast.remove();
+    });
+  }
 }
 
 // Intercept form submissions if blocking issues exist
@@ -152,7 +156,7 @@ document.addEventListener(
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "INSPECT_PAGE") {
     const fields = extractFormFields();
-    sendResponse({ success: true, fields, url: window.location.href, title: document.title });
+    sendResponse({ success: true, fields: fields, url: window.location.href, title: document.title });
     return true;
   }
 
@@ -171,6 +175,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "CLEAR_HIGHLIGHTS") {
     clearHighlights();
     currentGuardState.isArmed = false;
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "AUTO_FIX_FIELD") {
+    const selector = "input[name='" + request.field + "'], input#" + request.field + ", input#field-" + request.field;
+    const el = document.querySelector(selector);
+    if (el) {
+      el.value = request.value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.classList.remove("tasdeeq-highlight-blocking", "tasdeeq-highlight-warning");
+    }
     sendResponse({ success: true });
     return true;
   }

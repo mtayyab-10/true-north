@@ -1,4 +1,4 @@
-﻿/**
+/**
  * POST /api/extract
  * Receives a base64 image, sends it to Gemma 4 via Gemini API,
  * and returns structured extraction (line items, totals, etc.).
@@ -11,8 +11,8 @@ import { ExtractionResultSchema, ExtractRequestSchema } from "@/lib/types";
 
 const MODEL_ID = "gemma-4-26b-a4b-it";
 
-const SYSTEM_PROMPT = `You are a document data extractor for small business records.
-You receive an image of a handwritten or printed ledger, bill, or invoice (which may have English or Urdu labels).
+const SYSTEM_PROMPT = `You are a document data extractor for business records.
+You receive an image of a handwritten or printed ledger, bill, or invoice.
 Your job: extract ONLY what is clearly visible in the image. Never invent data.
 Return a single valid JSON object — no markdown, no code fences, no commentary — with this exact shape:
 
