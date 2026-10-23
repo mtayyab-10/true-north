@@ -1,0 +1,56 @@
+{
+  "rules": [
+    {
+      "rule_id": "R001",
+      "field": "total_amount",
+      "description": "Total amount on document must match typed total within tolerance",
+      "check_type": "within_tolerance",
+      "tolerance": 1.0,
+      "severity": "high"
+    },
+    {
+      "rule_id": "R002",
+      "field": "line_item_subtotal",
+      "description": "Sum of line items must equal subtotal on document",
+      "check_type": "sum_matches",
+      "tolerance": 0.5,
+      "severity": "high"
+    },
+    {
+      "rule_id": "R003",
+      "field": "invoice_number",
+      "description": "Invoice number must match exactly",
+      "check_type": "equals",
+      "severity": "medium"
+    },
+    {
+      "rule_id": "R004",
+      "field": "vendor_name",
+      "description": "Vendor name should match (case-insensitive)",
+      "check_type": "equals_ci",
+      "severity": "low"
+    },
+    {
+      "rule_id": "R005",
+      "field": "date",
+      "description": "Date on document must match typed date",
+      "check_type": "equals",
+      "severity": "medium"
+    },
+    {
+      "rule_id": "R006",
+      "field": "quantity",
+      "description": "Quantity of each line item must match exactly",
+      "check_type": "equals",
+      "severity": "high"
+    },
+    {
+      "rule_id": "R007",
+      "field": "unit_price",
+      "description": "Unit price must match within small tolerance",
+      "check_type": "within_tolerance",
+      "tolerance": 0.01,
+      "severity": "high"
+    }
+  ]
+}

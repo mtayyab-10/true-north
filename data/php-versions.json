@@ -1,0 +1,12 @@
+{
+  "versions": {
+    "8.5": "8.5.12",
+    "8.4": "8.4.27",
+    "8.3": "8.3.36",
+    "8.2": "8.2.35"
+  },
+  "unsupported_branches": ["8.1", "8.0", "7.4", "7.3", "7.2"],
+  "cves": ["CVE-2026-109618", "CVE-2026-109619"],
+  "notice_url": "https://www.php.net/ChangeLog-8.php",
+  "description": "Critical RCE fixes released in October 2026. Older branches receive no official fix."
+}

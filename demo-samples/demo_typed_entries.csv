@@ -1,0 +1,11 @@
+﻿# Demo typed entries for Tasdeeq — Al-Kareem General Store invoice demo
+# Intentional errors planted:
+#   - invoice_number: typed INV-2026-0824 (transposition), document says INV-2026-0842
+#   - total_amount:   typed 54000, document says 50400
+field,typed_value,note
+vendor_name,Al-Kareem General Store,correct
+invoice_number,INV-2026-0824,ERROR: transposition (824 vs 842)
+date,2026-10-15,correct
+total_amount,54000,ERROR: wrong amount (54000 vs 50400)
+quantity,5,correct
+unit_price,3200,correct
