@@ -1,12 +1,11 @@
 import {
   runDeterministicChecks,
   runStatisticalSignals,
-  runContextAndUncertaintyChecks,
   evaluateQualityGate,
   runUnifiedVerification,
-} from "./src/lib/verification-engine.js";
+} from "./src/lib/verification-engine.ts";
 
-console.log("=== TASDEEQ AUTOMATED TEST SUITE ===");
+console.log("=== TRUENORTH AUTOMATED TEST SUITE ===");
 
 let passed = 0;
 let failed = 0;

@@ -40,7 +40,7 @@ Rules:
 
 export async function POST(req: NextRequest) {
   // ── Validate API key presence (server-side only) ───────────────────────────
-  const apiKey = process.env.gemini_api_key;
+  const apiKey = process.env.gemini_api_key || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: "gemini_api_key is not configured on the server." },

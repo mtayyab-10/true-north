@@ -12,7 +12,7 @@ import { SummarizeRequestSchema } from "@/lib/types";
 const MODEL_ID = "gemma-4-26b-a4b-it";
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.gemini_api_key;
+  const apiKey = process.env.gemini_api_key || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "gemini_api_key not configured." }, { status: 500 });
   }
@@ -38,8 +38,13 @@ export async function POST(req: NextRequest) {
     )
     .join("\n");
 
+  const langInstruction =
+    language === "ur"
+      ? "Write your response in clear, fluent Urdu (اردو) using standard Urdu phrasing."
+      : "Write your response in clear, concise English.";
+
   const prompt = `You are a data quality verification assistant.
-Write your response in clear, concise English.
+${langInstruction}
 
 The following discrepancies were found between typed entries and what was read from the document:
 

@@ -97,6 +97,30 @@ export function runDeterministicChecks(
     });
   }
 
+  // Check Quantity * Unit Price multiplication
+  const qtyNum = parseNumeric(get("quantity"));
+  const unitPriceNum = parseNumeric(get("unit_price"));
+  if (qtyNum !== null && unitPriceNum !== null) {
+    const calculatedLineTotal = qtyNum * unitPriceNum;
+    if (totalAmountNum !== null && subtotalNum === null && Math.abs(calculatedLineTotal - totalAmountNum) > 1) {
+      findings.push({
+        finding_id: nextId(),
+        rule_id: "RULE_MATH_MISMATCH",
+        category: "rule_violation",
+        field: "total_amount",
+        label: "Total Amount Arithmetic",
+        typed_value: get("total_amount"),
+        expected_value: String(calculatedLineTotal),
+        evidence: `Typed total is ${totalAmountNum}, but quantity (${qtyNum}) × unit price (${unitPriceNum}) = ${calculatedLineTotal}.`,
+        explanation: `Deterministic math check failed: ${qtyNum} × ${unitPriceNum} equals ${calculatedLineTotal}, not ${totalAmountNum}. Discrepancy of ${Math.abs(calculatedLineTotal - totalAmountNum)}.`,
+        suggested_action: `Update Total Amount to ${calculatedLineTotal} or adjust quantity/unit price.`,
+        confidence: "high",
+        severity: "blocking",
+        status: "open",
+      });
+    }
+  }
+
   // Check Subtotal + Tax = Total (only when subtotal and tax are explicitly entered)
   if (subtotalNum !== null && taxNum !== null && totalAmountNum !== null) {
     const expectedTotal = subtotalNum + taxNum;

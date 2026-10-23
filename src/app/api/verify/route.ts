@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { entries, documentExtraction, context } = parsed.data;
-  const apiKey = process.env.gemini_api_key;
+  const apiKey = process.env.gemini_api_key || process.env.GEMINI_API_KEY;
   const sessionId = body.sessionId || createSessionId();
   const source = body.source || "web";
 
