@@ -171,7 +171,7 @@ export default function ControlledDemoFormPage() {
             <span style={{ fontWeight: 800, fontSize: "16px", color: "var(--accent-text)" }}>T</span>
           </div>
           <div>
-            <div className="topbar__title">TrueNorth</div>
+            <div className="topbar__title">TrueNorth <span style={{ fontSize: "12px", opacity: 0.65, fontWeight: "normal" }}>/ Tasdeeq تصدیق</span></div>
             <div className="topbar__sub">Controlled Form &amp; Pre-Submission Guard Demo</div>
           </div>
         </div>

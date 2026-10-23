@@ -37,6 +37,7 @@ export default function HomePage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryLanguage, setSummaryLanguage] = useState<"en" | "ur">("en");
   const [error, setError] = useState<string | null>(null);
   const [usedDemo, setUsedDemo] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
@@ -235,14 +236,14 @@ export default function HomePage() {
   };
 
   // Plain-Language Summary
-  const handleSummarize = async () => {
+  const handleSummarize = async (lang: "en" | "ur" = summaryLanguage) => {
     setIsSummarizing(true);
     setSummary(null);
     try {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findings, language: "en" }),
+        body: JSON.stringify({ findings, language: lang }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Summary failed");
@@ -276,7 +277,7 @@ export default function HomePage() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Link href="/" className="pk-logo">
               <span className="pk-logo-mark">T</span>
-              <span>TrueNorth</span>
+              <span>TrueNorth <span style={{ fontSize: "13px", fontWeight: "400", opacity: 0.65, marginLeft: "4px" }}>/ Tasdeeq تصدیق</span></span>
             </Link>
           </div>
 
@@ -897,26 +898,42 @@ export default function HomePage() {
               {/* Gemma 4 Plain Language Summary */}
               {findings.length > 0 && (
                 <div className="card animate-in" style={{ marginTop: "20px" }}>
-                  <div className="card__header">
+                  <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div className="card__title">
                       Gemma 4 Contextual Summary
                     </div>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      onClick={handleSummarize}
-                      disabled={isSummarizing}
-                      id="btn-summarize"
-                    >
-                      {isSummarizing ? "Generating…" : "Refresh Summary"}
-                    </button>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <select
+                        value={summaryLanguage}
+                        onChange={(e) => {
+                          const newLang = e.target.value as "en" | "ur";
+                          setSummaryLanguage(newLang);
+                        }}
+                        className="input"
+                        style={{ width: "95px", padding: "4px 8px", fontSize: "12px", height: "30px" }}
+                        id="select-summary-lang"
+                        aria-label="Summary Language"
+                      >
+                        <option value="en">English</option>
+                        <option value="ur">اردو</option>
+                      </select>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => handleSummarize(summaryLanguage)}
+                        disabled={isSummarizing}
+                        id="btn-summarize"
+                      >
+                        {isSummarizing ? "Generating…" : "Generate Summary"}
+                      </button>
+                    </div>
                   </div>
                   {summary ? (
-                    <div className="summary-box">
+                    <div className="summary-box" style={{ direction: summaryLanguage === "ur" ? "rtl" : "ltr" }}>
                       {summary}
                     </div>
                   ) : (
                     <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-                      Generate an AI plain-language summary of verification results.
+                      Generate an AI plain-language summary of verification results in English or Urdu.
                     </p>
                   )}
                 </div>
@@ -1061,7 +1078,7 @@ export default function HomePage() {
           <div>
             <Link href="/" className="pk-logo" style={{ fontSize: "18px" }}>
               <span className="pk-logo-mark" style={{ width: "24px", height: "24px", fontSize: "14px" }}>T</span>
-              <span>TrueNorth</span>
+              <span>TrueNorth <span style={{ opacity: 0.65, fontWeight: "normal" }}>/ Tasdeeq تصدیق</span></span>
             </Link>
             <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
               Catch the wrong number before it is saved.
