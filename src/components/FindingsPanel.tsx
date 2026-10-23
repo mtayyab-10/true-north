@@ -1,121 +1,356 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
-import type { Finding } from "@/lib/types";
+import type { Finding, FindingCategory, FindingStatus } from "@/lib/types";
 
 interface Props {
   findings: Finding[];
   onResolve: (
     id: string,
-    resolution: "accepted_doc" | "kept_typed" | "edited",
-    editedValue?: string
+    resolution: FindingStatus,
+    editedValue?: string,
+    reason?: string
   ) => void;
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  vendor_name:    "Vendor / Shop Name",
-  invoice_number: "Invoice / Bill #",
-  date:           "Date",
-  total_amount:   "Total Amount",
-  quantity:       "Quantity",
-  unit_price:     "Unit Price",
-  subtotal:       "Subtotal",
-  line_item_subtotal: "Line Items Subtotal",
+  vendor_name: "Vendor / Supplier Name",
+  invoice_number: "Invoice / Bill Number",
+  date: "Transaction Date",
+  total_amount: "Total Amount",
+  quantity: "Quantity",
+  unit_price: "Unit Price",
+  subtotal: "Subtotal",
+  tax: "Sales Tax / GST",
+  currency: "Currency",
+  item_description: "Item Description",
 };
 
-function StatusChip({ status }: { status: Finding["status"] }) {
-  const map: Record<Finding["status"], { cls: string; label: string }> = {
-    open:         { cls: "chip--open",    label: "Open" },
-    accepted_doc: { cls: "chip--doc",     label: "Used document value" },
-    kept_typed:   { cls: "chip--typed",   label: "Kept typed value" },
-    edited:       { cls: "chip--edited",  label: "Manually edited" },
+const CATEGORY_META: Record<
+  FindingCategory,
+  { label: string; icon: string; badgeCls: string; description: string }
+> = {
+  rule_violation: {
+    label: "Rule Violation",
+    icon: "🛑",
+    badgeCls: "badge--violation",
+    description: "Deterministic check established a defined rule failure.",
+  },
+  contextual_suspicion: {
+    label: "Contextual Suspicion",
+    icon: "🔍",
+    badgeCls: "badge--suspicion",
+    description: "AI or statistical benchmark signal identified an anomaly.",
+  },
+  uncertain_extraction: {
+    label: "Uncertain Extraction",
+    icon: "⚠️",
+    badgeCls: "badge--uncertain",
+    description: "Value cannot be read or verified with high visual confidence.",
+  },
+  missing_context: {
+    label: "Missing Context",
+    icon: "❓",
+    badgeCls: "badge--missing",
+    description: "Essential business or reporting context is missing.",
+  },
+};
+
+function StatusBadge({ status }: { status: FindingStatus }) {
+  const map: Record<string, { cls: string; label: string }> = {
+    open: { cls: "status-open", label: "Open" },
+    resolved_accepted: { cls: "status-resolved", label: "Accepted Exception" },
+    accepted_doc: { cls: "status-resolved", label: "Used Document Value" },
+    resolved_corrected: { cls: "status-resolved", label: "Corrected Value" },
+    edited: { cls: "status-resolved", label: "Corrected Value" },
+    kept_typed: { cls: "status-resolved", label: "Kept Typed Value" },
+    dismissed: { cls: "status-dismissed", label: "Dismissed" },
   };
-  const { cls, label } = map[status];
-  return <span className={`chip ${cls}`}>{label}</span>;
+  const item = map[status] || { cls: "status-open", label: status };
+  return <span className={`audit-badge ${item.cls}`}>{item.label}</span>;
 }
 
-function FindingCard({ finding, onResolve }: { finding: Finding; onResolve: Props["onResolve"] }) {
-  const [editVal, setEditVal] = useState("");
+function FindingItem({
+  finding,
+  onResolve,
+}: {
+  finding: Finding;
+  onResolve: Props["onResolve"];
+}) {
   const [showEdit, setShowEdit] = useState(false);
-  const resolved = finding.status !== "open";
+  const [showAccept, setShowAccept] = useState(false);
+  const [showDismiss, setShowDismiss] = useState(false);
+  const [editVal, setEditVal] = useState(finding.typed_value || "");
+  const [reasonVal, setReasonVal] = useState("");
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
+
+  const isResolved = finding.status !== "open";
+  const cat = CATEGORY_META[finding.category] || CATEGORY_META.rule_violation;
+  const isBlocking = finding.severity === "blocking" || finding.severity === "high";
 
   return (
-    <div className={`finding-card finding-card--${finding.severity} ${resolved ? "finding-card--resolved" : ""} animate-in`}>
+    <div
+      className={`finding-card finding-card--${finding.severity} ${
+        isResolved ? "finding-card--resolved" : ""
+      } animate-in`}
+      id={`card-${finding.finding_id}`}
+    >
       <div className="finding-card__top">
-        <div>
-          <div className="finding-card__field">{FIELD_LABELS[finding.field] ?? finding.field}</div>
-          <div className="finding-card__id">{finding.rule_id} · {finding.finding_id}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className={`category-pill ${cat.badgeCls}`}>
+              {cat.icon} {cat.label}
+            </span>
+            <span className={`sev-chip sev-chip--${finding.severity}`}>
+              {isBlocking ? "Blocking" : finding.severity}
+            </span>
+          </div>
+          <div className="finding-card__field">
+            {finding.label || FIELD_LABELS[finding.field] || finding.field}
+          </div>
+          <div className="finding-card__id">
+            Rule: {finding.rule_id} · ID: {finding.finding_id}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <span className={`sev-chip sev-chip--${finding.severity}`}>{finding.severity}</span>
-          <StatusChip status={finding.status} />
-        </div>
+        <StatusBadge status={finding.status} />
       </div>
 
+      {/* Values Comparison Grid */}
       <div className="finding-card__values">
         <div className="value-box value-box--typed">
-          <div className="value-box__label">Your typed value</div>
+          <div className="value-box__label">Observed / Submitted Value</div>
           <div className="value-box__val">{finding.typed_value || "—"}</div>
         </div>
-        <div className="value-box value-box--doc">
-          <div className="value-box__label">Document says (Gemma)</div>
-          <div className="value-box__val">{finding.document_value || "—"}</div>
-        </div>
+        {(finding.document_value || finding.expected_value) && (
+          <div className="value-box value-box--doc">
+            <div className="value-box__label">
+              {finding.document_value ? "Document / Scan Reference" : "Expected Calculated Value"}
+            </div>
+            <div className="value-box__val">
+              {finding.document_value || finding.expected_value}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="finding-card__evidence">{finding.evidence}</div>
+      {/* Evidence & Explanation Box */}
+      <div className="finding-evidence-block">
+        <div className="evidence-header">
+          <strong>Evidence:</strong> {finding.evidence}
+        </div>
+        {finding.explanation && (
+          <div className="explanation-body">
+            <strong>Context Analysis:</strong> {finding.explanation}
+          </div>
+        )}
+        {finding.suggested_action && (
+          <div className="action-body">
+            <strong>Recommended Next Step:</strong> {finding.suggested_action}
+          </div>
+        )}
+      </div>
 
-      {!resolved && (
-        <>
+      {/* Resolution Actions */}
+      {!isResolved && (
+        <div className="resolution-section">
           <div className="resolution-row">
+            {finding.document_value && (
+              <button
+                className="btn btn--success btn--sm"
+                onClick={() =>
+                  onResolve(
+                    finding.finding_id,
+                    "resolved_accepted",
+                    finding.document_value,
+                    "Adopted verified document value"
+                  )
+                }
+                id={`btn-adopt-doc-${finding.finding_id}`}
+              >
+                ✓ Adopt Document Value ({finding.document_value})
+              </button>
+            )}
+
             <button
-              className="btn btn--success btn--sm"
-              onClick={() => onResolve(finding.finding_id, "accepted_doc")}
-              id={`btn-accept-doc-${finding.finding_id}`}
-            >
-              ✓ Use document value
-            </button>
-            <button
-              className="btn btn--warning btn--sm"
-              onClick={() => onResolve(finding.finding_id, "kept_typed")}
-              id={`btn-keep-typed-${finding.finding_id}`}
-            >
-              ↺ Keep my typed value
-            </button>
-            <button
-              className="btn btn--ghost btn--sm"
-              onClick={() => { setShowEdit((s) => !s); setEditVal(""); }}
+              className="btn btn--primary btn--sm"
+              onClick={() => {
+                setShowEdit(!showEdit);
+                setShowAccept(false);
+                setShowDismiss(false);
+              }}
               id={`btn-edit-${finding.finding_id}`}
             >
-              ✏ Edit manually
+              ✏ Correct Value
             </button>
-          </div>
-          {showEdit && (
-            <div className="resolution-edit-row">
-              <input
-                className="table-input"
-                type="text"
-                placeholder="Enter corrected value…"
-                value={editVal}
-                onChange={(e) => setEditVal(e.target.value)}
-                id={`input-edit-${finding.finding_id}`}
-                aria-label="Manually edited value"
-              />
+
+            <button
+              className="btn btn--warning btn--sm"
+              onClick={() => {
+                setShowAccept(!showAccept);
+                setShowEdit(false);
+                setShowDismiss(false);
+              }}
+              id={`btn-accept-exc-${finding.finding_id}`}
+            >
+              ⚖ Accept as Legitimate Exception
+            </button>
+
+            {!isBlocking && (
               <button
-                className="btn btn--primary btn--sm"
-                disabled={!editVal.trim()}
-                onClick={() => { onResolve(finding.finding_id, "edited", editVal); setShowEdit(false); }}
-                id={`btn-confirm-edit-${finding.finding_id}`}
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  setShowDismiss(!showDismiss);
+                  setShowEdit(false);
+                  setShowAccept(false);
+                }}
+                id={`btn-dismiss-${finding.finding_id}`}
               >
-                Save
+                ✕ Dismiss with Note
               </button>
+            )}
+          </div>
+
+          {/* Edit Value Form */}
+          {showEdit && (
+            <div className="resolution-form animate-in">
+              <label className="resolution-form__label">Enter verified corrected value:</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  className="table-input"
+                  type="text"
+                  value={editVal}
+                  onChange={(e) => setEditVal(e.target.value)}
+                  placeholder="e.g. 50400"
+                  id={`input-correct-${finding.finding_id}`}
+                />
+                <button
+                  className="btn btn--primary btn--sm"
+                  disabled={!editVal.trim()}
+                  onClick={() => {
+                    onResolve(
+                      finding.finding_id,
+                      "resolved_corrected",
+                      editVal.trim(),
+                      "User corrected manual typo"
+                    );
+                    setShowEdit(false);
+                  }}
+                  id={`btn-save-edit-${finding.finding_id}`}
+                >
+                  Save & Resolve
+                </button>
+              </div>
             </div>
           )}
-        </>
+
+          {/* Accept Exception with Reason */}
+          {showAccept && (
+            <div className="resolution-form animate-in">
+              <label className="resolution-form__label">
+                Required Justification for Policy Exception:
+              </label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  className="table-input"
+                  type="text"
+                  value={reasonVal}
+                  onChange={(e) => setReasonVal(e.target.value)}
+                  placeholder="e.g. Special negotiated bulk discount approved by procurement"
+                  id={`input-reason-accept-${finding.finding_id}`}
+                />
+                <button
+                  className="btn btn--warning btn--sm"
+                  disabled={!reasonVal.trim()}
+                  onClick={() => {
+                    onResolve(
+                      finding.finding_id,
+                      "resolved_accepted",
+                      finding.typed_value,
+                      reasonVal.trim()
+                    );
+                    setShowAccept(false);
+                  }}
+                  id={`btn-confirm-accept-${finding.finding_id}`}
+                >
+                  Confirm Exception
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Dismiss Finding */}
+          {showDismiss && (
+            <div className="resolution-form animate-in">
+              <label className="resolution-form__label">Reason for Dismissal:</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  className="table-input"
+                  type="text"
+                  value={reasonVal}
+                  onChange={(e) => setReasonVal(e.target.value)}
+                  placeholder="e.g. Expected variation or seasonal adjustment"
+                  id={`input-reason-dismiss-${finding.finding_id}`}
+                />
+                <button
+                  className="btn btn--ghost btn--sm"
+                  disabled={!reasonVal.trim()}
+                  onClick={() => {
+                    onResolve(
+                      finding.finding_id,
+                      "dismissed",
+                      finding.typed_value,
+                      reasonVal.trim()
+                    );
+                    setShowDismiss(false);
+                  }}
+                  id={`btn-confirm-dismiss-${finding.finding_id}`}
+                >
+                  Dismiss Finding
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {resolved && finding.resolved_value && (
-        <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-          Final value: <strong style={{ color: "var(--text-secondary)" }}>{finding.resolved_value}</strong>
+      {/* Resolved State & Audit Trail */}
+      {isResolved && (
+        <div className="resolved-summary">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+              Resolved as: <strong>{finding.resolved_value || finding.typed_value}</strong>
+              {finding.resolution_reason && (
+                <span style={{ marginLeft: "6px", color: "var(--text-muted)" }}>
+                  — &quot;{finding.resolution_reason}&quot;
+                </span>
+              )}
+            </span>
+            <button
+              className="btn-link"
+              onClick={() => setShowAuditTrail(!showAuditTrail)}
+              style={{ fontSize: "12px", color: "var(--accent-primary)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              {showAuditTrail ? "Hide Audit History" : "View Audit History"}
+            </button>
+          </div>
+
+          {showAuditTrail && (
+            <div className="audit-trail-box animate-in">
+              <div style={{ fontWeight: 600, marginBottom: "4px" }}>Resolution Audit History:</div>
+              {finding.audit_trail && finding.audit_trail.length > 0 ? (
+                finding.audit_trail.map((entry: any, i: number) => (
+                  <div key={i} className="audit-entry">
+                    <span>{new Date(entry.timestamp).toLocaleTimeString()}</span> ·{" "}
+                    <strong>{entry.status}</strong>: {entry.reason || "Updated"}{" "}
+                    (Value: {entry.resolved_value})
+                  </div>
+                ))
+              ) : (
+                <div className="audit-entry">
+                  {finding.resolution_reason || "Resolved by user review."}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -123,20 +358,69 @@ function FindingCard({ finding, onResolve }: { finding: Finding; onResolve: Prop
 }
 
 export default function FindingsPanel({ findings, onResolve }: Props) {
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+
+  const categories: FindingCategory[] = [
+    "rule_violation",
+    "contextual_suspicion",
+    "uncertain_extraction",
+    "missing_context",
+  ];
+
+  const filtered =
+    activeFilter === "all"
+      ? findings
+      : findings.filter((f) => f.category === activeFilter);
+
+  const getCategoryCount = (cat: string) =>
+    findings.filter((f) => f.category === cat).length;
+
   if (findings.length === 0) {
     return (
-      <div className="findings-empty">
-        <div className="findings-empty__icon">✅</div>
-        <div className="findings-empty__text">No mismatches found — all entries match the document.</div>
+      <div className="findings-empty animate-in">
+        <div className="findings-empty__icon">✨</div>
+        <div className="findings-empty__title">No Discrepancies Detected</div>
+        <div className="findings-empty__text">
+          All entries conform to deterministic checks, statistical benchmarks, and contextual validation.
+        </div>
       </div>
     );
   }
 
   return (
     <div>
-      {findings.map((f) => (
-        <FindingCard key={f.finding_id} finding={f} onResolve={onResolve} />
-      ))}
+      {/* Category Filter Tabs */}
+      <div className="findings-filters">
+        <button
+          className={`filter-btn ${activeFilter === "all" ? "filter-btn--active" : ""}`}
+          onClick={() => setActiveFilter("all")}
+        >
+          All Findings ({findings.length})
+        </button>
+        {categories.map((catKey) => {
+          const count = getCategoryCount(catKey);
+          if (count === 0) return null;
+          const meta = CATEGORY_META[catKey];
+          return (
+            <button
+              key={catKey}
+              className={`filter-btn ${
+                activeFilter === catKey ? "filter-btn--active" : ""
+              }`}
+              onClick={() => setActiveFilter(catKey)}
+            >
+              {meta.icon} {meta.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Finding Items List */}
+      <div>
+        {filtered.map((f) => (
+          <FindingItem key={f.finding_id} finding={f} onResolve={onResolve} />
+        ))}
+      </div>
     </div>
   );
 }

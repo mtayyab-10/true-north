@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tasdeeq Quality Gate</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header__brand">
+        <div class="logo">ت</div>
+        <div>
+          <div class="title">Tasdeeq <span class="title-ur">تصدیق</span></div>
+          <div class="subtitle">Pre-Submission Quality Gate</div>
+        </div>
+      </div>
+      <span class="badge badge--gemma">Gemma 4</span>
+    </header>
+
+    <!-- Context Bar -->
+    <div class="context-bar">
+      <div class="context-select-group">
+        <label>Domain</label>
+        <select id="ctx-business-type">
+          <option value="Wholesale & Retail Grocery">Grocery</option>
+          <option value="Pharmacy & Healthcare Supplies">Pharmacy</option>
+          <option value="Hardware & Construction Materials">Hardware</option>
+          <option value="General Commercial Trade">General</option>
+        </select>
+      </div>
+      <div class="context-select-group">
+        <label>Currency</label>
+        <select id="ctx-currency">
+          <option value="PKR">PKR</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="action-bar">
+      <button id="btn-inspect" class="btn btn--secondary btn--sm">
+        🔍 Inspect Page Form
+      </button>
+      <button id="btn-verify" class="btn btn--primary btn--sm" disabled>
+        🛡️ Verify Entries
+      </button>
+    </div>
+
+    <!-- Quality Gate Banner -->
+    <div id="gate-banner" class="gate-banner gate-banner--hidden">
+      <div class="gate-banner__icon" id="gate-icon">🛑</div>
+      <div class="gate-banner__text">
+        <div class="gate-banner__title" id="gate-title">Quality Gate Active</div>
+        <div class="gate-banner__sub" id="gate-sub">Inspecting data…</div>
+      </div>
+    </div>
+
+    <!-- Inspected Fields Accordion -->
+    <div id="fields-section" class="section section--hidden">
+      <div class="section-title">
+        <span>Captured Fields (<span id="fields-count">0</span>)</span>
+      </div>
+      <div id="fields-list" class="fields-list"></div>
+    </div>
+
+    <!-- Findings Section -->
+    <div id="findings-section" class="section section--hidden">
+      <div class="section-title">
+        <span>Discrepancies &amp; Findings</span>
+        <button id="btn-highlight-toggle" class="btn-link">Highlight on Page</button>
+      </div>
+      <div id="findings-list" class="findings-list"></div>
+    </div>
+
+    <!-- Footer / Workspace Link -->
+    <footer class="footer">
+      <button id="btn-open-workspace" class="btn btn--ghost btn--full">
+        ↗ Open in Full Tasdeeq Workspace
+      </button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

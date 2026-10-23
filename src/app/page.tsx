@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { BatchState, Finding, TypedEntry, ExtractionResult } from "@/lib/types";
-import { compareEntries, resolveFinding, allResolved } from "@/lib/rules-engine";
+import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
+import type { Finding, TypedEntry, ExtractionResult, BusinessContext, FindingStatus } from "@/lib/types";
+import { resolveFinding } from "@/lib/rules-engine";
 import { DEMO_EXTRACTION, DEMO_TYPED_ENTRIES } from "@/lib/demo-cache";
 
 import Uploader from "@/components/Uploader";
@@ -33,10 +34,45 @@ export default function HomePage() {
   const [summary, setSummary] = useState<string | null>(null);
 
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryLang, setSummaryLang] = useState<"en" | "ur">("en");
   const [error, setError] = useState<string | null>(null);
   const [usedDemo, setUsedDemo] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+
+  // Business Context State
+  const [businessContext, setBusinessContext] = useState<BusinessContext>({
+    business_type: "Wholesale & Retail Grocery",
+    currency: "PKR",
+    reporting_period: "October 2026",
+    allowed_variance_pct: 0,
+    notes: "",
+  });
+  const [showContextDrawer, setShowContextDrawer] = useState(false);
+
+  // ── Load Session from URL if present (e.g. from Browser Extension) ────────
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sId = urlParams.get("session");
+      if (sId) {
+        setSessionId(sId);
+        fetch(`/api/session?id=${encodeURIComponent(sId)}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.session) {
+              setTypedEntries(data.session.entries || DEFAULT_ENTRIES);
+              setExtraction(data.session.documentExtraction || null);
+              setFindings(data.session.findings || []);
+              if (data.session.context) setBusinessContext(data.session.context);
+              setStep("resolve");
+            }
+          })
+          .catch((err) => console.warn("Could not load session:", err));
+      }
+    }
+  }, []);
 
   // ── Image upload handler ──────────────────────────────────────────────────
   const handleImageSelect = useCallback((base64: string, mime: string, preview: string) => {
@@ -49,17 +85,6 @@ export default function HomePage() {
     setSummary(null);
     setStep("upload");
   }, []);
-
-  // ── Load demo mode ────────────────────────────────────────────────────────
-  const loadDemo = () => {
-    setTypedEntries(DEMO_TYPED_ENTRIES);
-    setExtraction(DEMO_EXTRACTION);
-    setImagePreview(null);
-    setUsedDemo(true);
-    const found = compareEntries(DEMO_EXTRACTION, DEMO_TYPED_ENTRIES);
-    setFindings(found);
-    setStep("resolve");
-  };
 
   // ── Step 1 → 2: Extract with Gemma ───────────────────────────────────────
   const handleExtract = async () => {
@@ -90,23 +115,83 @@ export default function HomePage() {
     }
   };
 
-  // ── Step 2 → 3: Compare entries ──────────────────────────────────────────
-  const handleCompare = () => {
-    if (!extraction) return;
-    const found = compareEntries(extraction, typedEntries);
-    setFindings(found);
-    setStep("resolve");
+  // ── Step 2 → 3: Unified Verification (Deterministic + Statistical + Gemma) ─
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: typedEntries,
+          documentExtraction: extraction,
+          context: businessContext,
+          sessionId,
+          source: "web",
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Verification failed");
+      }
+
+      setFindings(json.findings || []);
+      setSessionId(json.sessionId);
+      if (json.summary) setSummary(json.summary);
+      setStep("resolve");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification error";
+      setError(msg);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
-  // ── Resolve a finding ─────────────────────────────────────────────────────
+  // ── Load demo mode ────────────────────────────────────────────────────────
+  const loadDemo = async () => {
+    setTypedEntries(DEMO_TYPED_ENTRIES);
+    setExtraction(DEMO_EXTRACTION);
+    setImagePreview(null);
+    setUsedDemo(true);
+
+    setIsVerifying(true);
+    try {
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: DEMO_TYPED_ENTRIES,
+          documentExtraction: DEMO_EXTRACTION,
+          context: businessContext,
+          source: "web",
+        }),
+      });
+      const data = await res.json();
+      setFindings(data.findings || []);
+      if (data.summary) setSummary(data.summary);
+      setStep("resolve");
+    } catch {
+      setStep("compare");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // ── Resolve a finding with audit trail & reason ───────────────────────────
   const handleResolve = (
     findingId: string,
-    resolution: "accepted_doc" | "kept_typed" | "edited",
-    editedValue?: string
+    resolution: FindingStatus,
+    editedValue?: string,
+    reason?: string
   ) => {
     setFindings((prev) =>
       prev.map((f) =>
-        f.finding_id === findingId ? resolveFinding(f, resolution, editedValue) : f
+        f.finding_id === findingId
+          ? resolveFinding(f, resolution, editedValue, reason)
+          : f
       )
     );
   };
@@ -125,49 +210,24 @@ export default function HomePage() {
       if (!res.ok) throw new Error(json.error ?? "Summary failed");
       setSummary(json.summary);
     } catch (err: unknown) {
-      setSummary("⚠ Could not generate summary: " + (err instanceof Error ? err.message : "Unknown"));
+      setSummary(
+        "⚠ Could not generate summary: " +
+          (err instanceof Error ? err.message : "Unknown")
+      );
     } finally {
       setIsSummarizing(false);
     }
   };
 
-  // ── Export CSV ────────────────────────────────────────────────────────────
-  const handleExport = () => {
-    const rows = [
-      ["field", "typed_value", "resolved_value", "status"],
-      ...typedEntries.map((e) => {
-        const f = findings.find((fi) => fi.field === e.field);
-        return [
-          e.field,
-          e.typed_value,
-          f?.resolved_value ?? e.typed_value,
-          f?.status ?? "no_finding",
-        ];
-      }),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tasdeeq_batch_${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const canCompare = step === "compare" && extraction !== null;
-  const allDone = findings.length > 0 && allResolved(findings);
-  const openCount = findings.filter((f) => f.status === "open").length;
-
-  // ── Steps indicator ───────────────────────────────────────────────────────
   const steps = [
-    { id: "upload",  label: "Upload" },
-    { id: "compare", label: "Verify" },
-    { id: "resolve", label: "Resolve" },
-    { id: "export",  label: "Export" },
+    { id: "upload", label: "Upload & Context" },
+    { id: "compare", label: "Verification Engine" },
+    { id: "resolve", label: "Findings & Audit" },
+    { id: "export", label: "Quality Gate Release" },
   ] as const;
 
   const stepIndex = (s: Step) => steps.findIndex((st) => st.id === s);
+  const openCount = findings.filter((f) => f.status === "open").length;
 
   return (
     <div className="page-shell">
@@ -177,9 +237,19 @@ export default function HomePage() {
           <div className="topbar__logo glow-pulse">ت</div>
           <div>
             <span className="topbar__title">Tasdeeq</span>
-            <span className="topbar__sub">تصدیق</span>
+            <span className="topbar__sub">تصدیق · Data Quality & Pre-Submission Gate</span>
           </div>
         </div>
+
+        <nav className="nav-tab-bar">
+          <span className="nav-tab-item nav-tab-item--active">
+            Main Workspace
+          </span>
+          <Link href="/demo-form" className="nav-tab-item">
+            Controlled Demo Form ↗
+          </Link>
+        </nav>
+
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div className="steps">
             {steps.map((s, i) => {
@@ -196,27 +266,148 @@ export default function HomePage() {
               );
             })}
           </div>
-          <span className="topbar__badge">Gemma 4 · 26B</span>
+          <span className="topbar__badge">Gemma 4 · 26B Hybrid</span>
         </div>
       </header>
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <main className="main-content">
-
         {/* Hero tagline */}
-        <div style={{ textAlign: "center", paddingBottom: "8px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "8px", letterSpacing: "-0.5px" }}>
-            Catch wrong numbers <span style={{ color: "var(--accent)" }}>before they cost you.</span>
+        <div style={{ textAlign: "center", paddingBottom: "12px" }}>
+          <h1
+            style={{
+              fontSize: "28px",
+              fontWeight: 700,
+              marginBottom: "8px",
+              letterSpacing: "-0.5px",
+            }}
+          >
+            Context-Aware Verification &amp;{" "}
+            <span style={{ color: "var(--accent)" }}>Pre-Submission Quality Gate</span>
           </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "15px", maxWidth: "560px", margin: "0 auto" }}>
-            Upload a photo of a bill, ledger or invoice. Gemma reads the numbers.
-            You review what doesn&apos;t match.
+          <p
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: "14px",
+              maxWidth: "680px",
+              margin: "0 auto",
+            }}
+          >
+            Ordinary code for certainty. Statistics for signals. Gemma 4 for context.
+            Human review for accountability.
           </p>
+        </div>
+
+        {/* Business Context Drawer / Controls */}
+        <div className="context-card animate-in">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              cursor: "pointer",
+            }}
+            onClick={() => setShowContextDrawer(!showContextDrawer)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px" }}>⚙️</span>
+              <div>
+                <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
+                  Business Context &amp; Reporting Parameters
+                </strong>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--text-secondary)",
+                    marginLeft: "8px",
+                  }}
+                >
+                  ({businessContext.business_type} · {businessContext.currency} ·{" "}
+                  {businessContext.reporting_period})
+                </span>
+              </div>
+            </div>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowContextDrawer(!showContextDrawer);
+              }}
+            >
+              {showContextDrawer ? "Hide Context" : "Edit Context"}
+            </button>
+          </div>
+
+          {showContextDrawer && (
+            <div className="context-grid animate-in">
+              <div className="context-field">
+                <label>Business Classification</label>
+                <select
+                  className="table-input"
+                  value={businessContext.business_type}
+                  onChange={(e) =>
+                    setBusinessContext({ ...businessContext, business_type: e.target.value })
+                  }
+                >
+                  <option value="Wholesale & Retail Grocery">Wholesale &amp; Retail Grocery</option>
+                  <option value="Pharmacy & Healthcare Supplies">Pharmacy &amp; Healthcare</option>
+                  <option value="Hardware & Construction Materials">Construction Materials</option>
+                  <option value="General Commercial Trade">General Commercial Trade</option>
+                </select>
+              </div>
+
+              <div className="context-field">
+                <label>Reporting Currency</label>
+                <select
+                  className="table-input"
+                  value={businessContext.currency}
+                  onChange={(e) =>
+                    setBusinessContext({ ...businessContext, currency: e.target.value })
+                  }
+                >
+                  <option value="PKR">PKR (Pakistani Rupee)</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="SAR">SAR (Saudi Riyal)</option>
+                  <option value="AED">AED (UAE Dirham)</option>
+                </select>
+              </div>
+
+              <div className="context-field">
+                <label>Reporting Period</label>
+                <input
+                  type="text"
+                  className="table-input"
+                  value={businessContext.reporting_period}
+                  onChange={(e) =>
+                    setBusinessContext({
+                      ...businessContext,
+                      reporting_period: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. October 2026"
+                />
+              </div>
+
+              <div className="context-field">
+                <label>Contextual Notes / Specifics</label>
+                <input
+                  type="text"
+                  className="table-input"
+                  value={businessContext.notes || ""}
+                  onChange={(e) =>
+                    setBusinessContext({ ...businessContext, notes: e.target.value })
+                  }
+                  placeholder="e.g. High inflation surcharge approved"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Error alert */}
         {error && (
-          <div className="alert alert--error animate-in">
+          <div className="alert alert--error animate-in" style={{ marginBottom: "16px" }}>
             <span>⚠</span>
             <span>{error}</span>
           </div>
@@ -229,14 +420,11 @@ export default function HomePage() {
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">📄</div>
-                Document Photo
+                Document Photo / Invoice Scan
               </div>
-              <span className="card__badge badge--step">Step 1</span>
+              <span className="card__badge badge--step">Visual Input</span>
             </div>
-            <Uploader
-              onImageSelect={handleImageSelect}
-              preview={imagePreview}
-            />
+            <Uploader onImageSelect={handleImageSelect} preview={imagePreview} />
             {imageBase64 && !isExtracting && step === "upload" && (
               <div style={{ marginTop: "16px" }}>
                 <button
@@ -245,27 +433,31 @@ export default function HomePage() {
                   onClick={handleExtract}
                   id="btn-extract"
                 >
-                  <span>✨</span> Extract with Gemma 4
+                  <span>✨</span> Extract Document with Gemma 4
                 </button>
               </div>
             )}
             {isExtracting && (
               <div className="loading-overlay">
                 <div className="spinner" />
-                <span>Gemma is reading the document&hellip;</span>
+                <span>Gemma 4 is reading the document&hellip;</span>
               </div>
             )}
             {!imageBase64 && !usedDemo && (
               <div style={{ marginTop: "16px", textAlign: "center" }}>
-                <button className="btn btn--ghost btn--sm" onClick={loadDemo} id="btn-demo">
-                  ⚡ Load demo sample
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={loadDemo}
+                  id="btn-demo"
+                >
+                  ⚡ Load Demo Invoice Sample
                 </button>
               </div>
             )}
             {usedDemo && (
               <div className="alert alert--info animate-in" style={{ marginTop: "12px" }}>
                 <span>ℹ</span>
-                <span>Demo mode: pre-cached extraction loaded. 2 planted errors await discovery.</span>
+                <span>Demo mode loaded: Sample invoice with planted transposition and arithmetic discrepancies.</span>
               </div>
             )}
           </div>
@@ -275,103 +467,119 @@ export default function HomePage() {
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">⌨️</div>
-                Typed Entries
+                Manual / Captured Data
               </div>
-              <span className="card__badge badge--step">Step 2</span>
+              <span className="card__badge badge--step">Data Source</span>
             </div>
-            <EntryTable
-              entries={typedEntries}
-              onChange={setTypedEntries}
-            />
-            {canCompare && (
-              <div style={{ marginTop: "16px" }}>
-                <button
-                  className="btn btn--primary"
-                  style={{ width: "100%" }}
-                  onClick={handleCompare}
-                  id="btn-compare"
-                >
-                  🔍 Find Mismatches
-                </button>
-              </div>
-            )}
+            <EntryTable entries={typedEntries} onChange={setTypedEntries} />
+            <div style={{ marginTop: "16px" }}>
+              <button
+                className="btn btn--primary btn--lg"
+                style={{ width: "100%" }}
+                onClick={handleVerify}
+                disabled={isVerifying}
+                id="btn-run-verification"
+              >
+                {isVerifying ? (
+                  <>
+                    <span className="spinner" style={{ width: 14, height: 14 }} />
+                    Verifying (Rules + Benchmarks + Gemma 4)…
+                  </>
+                ) : (
+                  "🔍 Run Verification Pipeline"
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Extraction preview */}
         {extraction && (
-          <div className="card animate-in">
+          <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">🔎</div>
-                What Gemma Read
+                Visual Extraction (Gemma 4 Multimodal)
               </div>
               <span className="card__badge badge--done">Extracted</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                gap: "12px",
+              }}
+            >
               {[
                 ["Vendor", extraction.vendor_name],
                 ["Invoice #", extraction.invoice_number],
                 ["Date", extraction.date],
-                ["Subtotal", extraction.subtotal != null ? `${extraction.currency ?? ""} ${extraction.subtotal}` : null],
-                ["Tax", extraction.tax != null ? `${extraction.currency ?? ""} ${extraction.tax}` : null],
-                ["Total", extraction.total_amount != null ? `${extraction.currency ?? ""} ${extraction.total_amount}` : null],
+                [
+                  "Subtotal",
+                  extraction.subtotal != null
+                    ? `${extraction.currency ?? ""} ${extraction.subtotal}`
+                    : null,
+                ],
+                [
+                  "Tax",
+                  extraction.tax != null
+                    ? `${extraction.currency ?? ""} ${extraction.tax}`
+                    : null,
+                ],
+                [
+                  "Total",
+                  extraction.total_amount != null
+                    ? `${extraction.currency ?? ""} ${extraction.total_amount}`
+                    : null,
+                ],
                 ["Language", extraction.language_detected],
-              ].map(([label, val]) => (
-                val != null && (
-                  <div key={label as string} className="value-box">
-                    <div className="value-box__label">{label as string}</div>
-                    <div className="value-box__val">{val as string}</div>
-                  </div>
-                )
-              ))}
+              ].map(
+                ([label, val]) =>
+                  val != null && (
+                    <div key={label as string} className="value-box">
+                      <div className="value-box__label">{label as string}</div>
+                      <div className="value-box__val">{val as string}</div>
+                    </div>
+                  )
+              )}
             </div>
             {extraction.raw_text_snippet && (
               <div className="finding-card__evidence" style={{ marginTop: "14px" }}>
                 &ldquo;{extraction.raw_text_snippet}&rdquo;
               </div>
             )}
-            {extraction.line_items?.length > 0 && (
-              <div style={{ marginTop: "16px", overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Description</th>
-                      <th>Qty</th>
-                      <th>Unit Price</th>
-                      <th>Line Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {extraction.line_items.map((li, i) => (
-                      <tr key={i}>
-                        <td>{li.description}</td>
-                        <td>{li.quantity ?? "—"}</td>
-                        <td>{li.unit_price ?? "—"}</td>
-                        <td>{li.line_total ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         )}
 
-        {/* ── Step 3: Findings ────────────────────────────────────────── */}
-        {(step === "resolve" || step === "export") && (
-          <div className="card animate-in">
+        {/* ── Step 3: Findings & Human Accountability ─────────────────── */}
+        {step === "resolve" && (
+          <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">⚡</div>
-                Findings
+                Verification Findings &amp; Review
                 {findings.length > 0 && (
-                  <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: "13px" }}>
+                  <span
+                    style={{
+                      color: "var(--text-muted)",
+                      fontWeight: 400,
+                      fontSize: "13px",
+                      marginLeft: "6px",
+                    }}
+                  >
                     ({openCount} open, {findings.length - openCount} resolved)
                   </span>
                 )}
               </div>
-              <span className={`card__badge ${findings.length === 0 ? "badge--done" : openCount === 0 ? "badge--done" : "badge--warn"}`}>
+              <span
+                className={`card__badge ${
+                  findings.length === 0
+                    ? "badge--done"
+                    : openCount === 0
+                    ? "badge--done"
+                    : "badge--warn"
+                }`}
+              >
                 {findings.length === 0 ? "All clear" : `${openCount} open`}
               </span>
             </div>
@@ -379,13 +587,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── Summary ─────────────────────────────────────────────────── */}
+        {/* ── Summary & Plain-Language Explanation ───────────────────── */}
         {step === "resolve" && findings.length > 0 && (
-          <div className="card animate-in">
+          <div className="card animate-in" style={{ marginTop: "24px" }}>
             <div className="card__header">
               <div className="card__title">
                 <div className="card__icon">💬</div>
-                Gemma Summary
+                Gemma 4 Executive Summary
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <select
@@ -403,7 +611,14 @@ export default function HomePage() {
                   disabled={isSummarizing}
                   id="btn-summarize"
                 >
-                  {isSummarizing ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Generating…</> : "Generate Summary"}
+                  {isSummarizing ? (
+                    <>
+                      <span className="spinner" style={{ width: 14, height: 14 }} />{" "}
+                      Generating…
+                    </>
+                  ) : (
+                    "Regenerate Plain-Language Summary"
+                  )}
                 </button>
               </div>
             </div>
@@ -413,21 +628,21 @@ export default function HomePage() {
               </div>
             ) : (
               <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-                Ask Gemma to write a plain-language summary of the findings.
+                Click above to generate a plain-language summary of the verification findings.
               </p>
             )}
           </div>
         )}
 
-        {/* ── Step 4: Export Gate ──────────────────────────────────────── */}
+        {/* ── Step 4: Quality Gate & Release Policy ───────────────────── */}
         {step === "resolve" && (
           <ExportGate
             findings={findings}
-            allResolved={allDone}
-            onExport={handleExport}
+            typedEntries={typedEntries}
+            context={businessContext}
+            sessionId={sessionId}
           />
         )}
-
       </main>
     </div>
   );

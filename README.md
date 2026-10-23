@@ -1,170 +1,182 @@
-﻿# Tasdeeq — تصدیق
+# Tasdeeq — تصدیق
 
-**Catch typing mistakes in ledger entries before they cost you.**
+**Context-Aware Data Quality & Pre-Submission Verification System**
 
-> *Tasdeeq* means *verification* in Urdu.
+> *Tasdeeq* means *verification / authentication* in Urdu.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Model: Gemma 4 26B A4B IT](https://img.shields.io/badge/Model-Gemma%204%2026B-orange)](https://ai.google.dev/gemma)
+[![Platform: Web + Extension](https://img.shields.io/badge/Platform-Web%20%2B%20Browser%20Extension-blueviolet)](#)
 
 ---
 
-## What it does
+## The Product Vision & Core Principle
 
-Small shop owners keep handwritten bills, ledgers and invoices, then retype the numbers into a spreadsheet. Typing mistakes and digit transpositions go unnoticed until they cause a loss.
+Tasdeeq is a context-aware data quality and pre-submission verification system designed to identify suspicious, inconsistent, incorrect, or insufficiently supported information before that data is submitted, saved, or released into downstream accounting, ERP, or ledger systems.
 
-**Tasdeeq** closes that gap:
+### Core Architecture Principle
 
-1. Upload a photo of a bill, ledger or invoice (English or Urdu labels both work).
-2. **Gemma 4** reads the image through the Gemini API and extracts structured line items, totals, dates and vendor info.
-3. Plain code compares the extracted values against your typed entries using a swappable JSON rules file. The model never decides what is a mismatch — code does.
-4. Each finding shows the field, your typed value, what the document says, the evidence, confidence and severity.
-5. You resolve each finding: accept the document value, keep your typed value, or edit manually.
-6. The export gate releases a verified CSV only when every finding is resolved. Unresolved findings block the release.
-7. Gemma also writes a short plain-language summary of the findings, in English or Urdu on request.
+> **Ordinary code for certainty. Statistics for signals. An agent for context. Human review for accountability.**
+
+Tasdeeq distinguishes:
+1. **Rule Violations**: Deterministic checks proving a strict rule has failed (arithmetic mismatch, missing mandatory fields, negative amounts, future dates).
+2. **Contextual Suspicions**: AI or statistical signals identifying anomalies that deserve human investigation (e.g., commodity unit prices 10x market baselines, incompatible vendor/item classifications).
+3. **Uncertain Extractions**: Low visual confidence or illegible handwritten/scanned values.
+4. **Missing Context**: Inability to evaluate responsibly without missing parameters (such as unspecified currencies or tax exemption justifications).
 
 ---
 
-## How to run
+## Two Complementary Interfaces, One Unified Engine
+
+Tasdeeq delivers two synchronized interfaces powered by the same backend verification engine (`/api/verify`):
+
+### 1. Main Web Workspace (`/`)
+- Enter data manually or upload document photos/invoices (English & Urdu labels).
+- Configure business context (business domain, currency, reporting period, tolerance).
+- Run the unified verification pipeline combining deterministic math rules, benchmark statistics, and Gemma 4 contextual reasoning.
+- Interactive findings review with evidence, explanations, and suggested next steps.
+- Human review accountability: correct values, accept legitimate exceptions with required business justifications, or dismiss with notes.
+- Strict **Quality Gate**: Prevents release while blocking errors remain. Generates cryptographically verified release certificates (`/api/release`) with full audit history export (JSON & CSV).
+
+### 2. Browser Extension (`extension/`)
+- Manifest V3 extension compatible with Chromium browsers (Chrome & Edge).
+- Automatically inspects input fields, selects, and labels on active web forms.
+- Runs verification against the shared Tasdeeq engine.
+- Highlights flagged fields directly on the page DOM (glowing red outline for blocking errors, amber for suspicions, with floating tooltips).
+- **Pre-Submission Guard**: Intercepts form submissions if unresolved blocking discrepancies exist, halting erroneous data release before external databases are updated.
+- Quick in-popup exception review or one-click session transfer into the full Web Workspace (`?session=TSD-...`).
+
+### 3. Controlled Demonstration Form (`/demo-form`)
+- Realistic supplier payable and expense ingestion portal.
+- Pre-loaded with one-click clean and flawed datasets (arithmetic errors, digit transpositions, price outliers).
+- Built-in live testing ground for both in-page Pre-Submission Guarding and the Browser Extension.
+
+---
+
+## Architecture Overview
+
+```
+tasdeeq/
+├── extension/                     ← Chromium Manifest V3 Browser Extension
+│   ├── manifest.json              ← MV3 manifest with activeTab & scripting
+│   ├── content.js                 ← Form field discovery, DOM highlighting, pre-submission guard
+│   ├── content.css                ← In-page glow borders and badge styles
+│   ├── popup.html / popup.js      ← In-workflow extension UI & verification trigger
+│   └── icons/                     ← 16px, 48px, 128px PNG icons
+│
+├── src/
+│   ├── app/
+│   │   ├── page.tsx               ← Main Web Workspace UI
+│   │   ├── demo-form/page.tsx     ← Controlled Demo Form & Pre-Submission Guard
+│   │   ├── api/
+│   │   │   ├── verify/route.ts    ← Unified Verification API (Deterministic + Stat + Gemma 4)
+│   │   │   ├── release/route.ts   ← Server-side Quality Gate & signed release records
+│   │   │   ├── session/route.ts   ← Shared review state between Extension & Web
+│   │   │   ├── extract/route.ts   ← Multimodal document OCR via Gemma 4
+│   │   │   └── summarize/route.ts ← Executive plain-language bilingual summary (En/Ur)
+│   │   └── globals.css            ← Design system tokens and component styles
+│   │
+│   ├── lib/
+│   │   ├── types.ts               ← Zod schemas, 4 finding categories, quality gate states
+│   │   ├── verification-engine.ts ← Core engine: code certainty + stats + Gemma reasoning
+│   │   ├── review-store.ts        ← In-memory session store for cross-interface synchronization
+│   │   ├── rules-engine.ts        ← Backward-compatible rule dispatch
+│   │   └── demo-cache.ts          ← Pre-cached invoice extraction for offline demo
+│   │
+│   └── components/
+│       ├── Uploader.tsx           ← Drag-and-drop document photo zone
+│       ├── EntryTable.tsx         ← Manual entry table
+│       ├── FindingsPanel.tsx      ← Categorized findings review, audit trail & exception actions
+│       └── ExportGate.tsx         ← Quality gate card enforcing release policies
+```
+
+---
+
+## How Gemma 4 is Integrated
+
+Gemma 4 (`gemma-4-26b-a4b-it`) serves three distinct, high-impact roles:
+1. **Multimodal Visual Extraction (`/api/extract`)**: Interprets images of handwritten and printed bills, returning structured line items, subtotals, taxes, and vendor data.
+2. **Contextual Reasoning & Anomaly Detection (`/api/verify`)**: Analyzes the submitted transaction in light of business domain and contextual parameters. Identifies semantic anomalies that hardcoded rules cannot detect without promoting mere suspicions to errors.
+3. **Plain-Language Executive Summary (`/api/summarize`)**: Synthesizes open and resolved issues into concise, non-technical summaries in English or Urdu.
+
+*Security Guarantee:* The Gemini API key remains strictly on the server (`process.env.gemini_api_key`) and is never bundled in frontend code or the browser extension.
+
+---
+
+## Quickstart & Installation
 
 ### Prerequisites
+- Node.js 18+ (tested with Node 20 & 24)
+- Google Gemini API key (free tier supported)
 
-- Node.js 18 or later
-- A [Gemini API key](https://aistudio.google.com/) (free tier works)
-
-### Setup
-
+### 1. Run the Web Workspace
 ```bash
 git clone https://github.com/YOUR_USERNAME/tasdeeq.git
 cd tasdeeq
 npm install
 ```
 
-Create `.env.local` in the project root:
-
-```
+Configure `.env.local` in the project root:
+```env
 gemini_api_key=YOUR_GEMINI_API_KEY_HERE
 ```
 
-> ⚠ Never commit `.env.local`. It is in `.gitignore`.
-
-### Run locally
-
+Start the application:
 ```bash
-npm run dev
+npm run dev -- --port 3001
 ```
+Open [http://localhost:3001](http://localhost:3001) in your browser.
 
-Open [http://localhost:3000](http://localhost:3000).
-
-### No API key? Use demo mode
-
-Click **"Load demo sample"** on the home page. This loads a pre-cached extraction of a sample invoice with two intentional errors, so you can see the full flow without a network call.
-
----
-
-## Architecture
-
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── extract/route.ts     ← POST: image → Gemma 4 → structured JSON
-│   │   └── summarize/route.ts   ← POST: findings → Gemma 4 → plain text
-│   ├── page.tsx                 ← Main UI (client component)
-│   ├── layout.tsx
-│   └── globals.css              ← Full custom design system (no CSS framework)
-├── lib/
-│   ├── types.ts                 ← Zod schemas + TypeScript types
-│   ├── rules-engine.ts          ← Pure-code comparison logic, no AI
-│   └── demo-cache.ts            ← Pre-cached extraction for offline demo
-└── components/
-    ├── Uploader.tsx
-    ├── EntryTable.tsx
-    ├── FindingsPanel.tsx
-    └── ExportGate.tsx
-data/
-├── rules.json                   ← Swappable rules file (rule_id, field, check_type, severity)
-└── php-versions.json            ← Roadmap: PHP CVE version table
-demo-samples/                    ← Synthetic demo data and photo guide
-```
-
-### Key design decisions
-
-| Concern | Decision |
-|---|---|
-| **Who decides mismatches?** | Code (`rules-engine.ts`), never the model |
-| **Rules format** | One JSON file — swappable without touching code |
-| **API key safety** | Key read only in Next.js server routes; never logged, never sent to the client |
-| **Offline demo** | Pre-cached extraction in `demo-cache.ts`; no network needed |
-| **JSON parsing** | Strip code fences → parse → Zod validate → retry once on failure |
+### 2. Install the Browser Extension
+1. Open Google Chrome or Microsoft Edge and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** (toggle in top right).
+3. Click **Load unpacked**.
+4. Select the `extension/` folder located inside the `tasdeeq/` repository.
+5. The **Tasdeeq** extension icon (`ت`) will appear in your browser toolbar.
 
 ---
 
-## Model
+## End-to-End Demonstration Script
 
-**Gemma 4 26B A4B IT** (`gemma-4-26b-a4b-it`)
+### Scenario A: Web Workspace Verification & Quality Gate Release
+1. Open `http://localhost:3001`.
+2. Click **"⚡ Load Demo Invoice Sample"**.
+3. Notice that 3 discrepancies are detected:
+   - Arithmetic error: Total 54,000 does not equal 5 × 3,200 = 16,000.
+   - Document total mismatch: Typed 54,000 vs document visual 50,400.
+   - Invoice transposition: Typed `INV-2026-0824` vs document visual `INV-2026-0842`.
+4. Observe that the **Quality Gate is Blocked** (Release button locked).
+5. Resolve findings:
+   - Click **"✓ Adopt Document Value (50400)"**.
+   - Click **"✓ Adopt Document Value (INV-2026-0842)"**.
+   - Correct the arithmetic line or accept the legitimate manual override with a required reason.
+6. Once all blocking findings are resolved, the Quality Gate transitions to **Ready for Release**.
+7. Click **"🚀 Authorize & Release Data"** to generate the signed release record and download verified CSV/JSON audit bundles.
 
-- Architecture: Mixture-of-Experts, ~26B total parameters, ~4B active per token
-- Context window: 256K tokens
-- Modalities: Text + Image (native multimodal)
-- License: [Apache 2.0](https://ai.google.dev/gemma/terms) — see [official model card](https://ai.google.dev/gemma/docs/model_card_4)
-- Accessed via: [Gemini API](https://ai.google.dev) (Google AI Studio)
-
-Gemma is central to this project: without its multimodal image-reading capability, extracting structured data from handwritten and printed paper records would not be possible. The model reads the document; code does all the checking.
-
----
-
-## Privacy
-
-- Uploaded images are sent to the Gemini API for extraction.
-- Nothing is stored on any server. There is no database, no login, no session persistence.
-- The API key is read only on the server side and never exposed to the browser.
-
----
-
-## Rules file
-
-`data/rules.json` contains a list of rules. Each rule has:
-
-| Field | Meaning |
-|---|---|
-| `rule_id` | Unique identifier (e.g. `R001`) |
-| `field` | Which field to check (e.g. `total_amount`) |
-| `check_type` | `equals`, `equals_ci`, `within_tolerance`, `sum_matches` |
-| `tolerance` | Numeric tolerance for `within_tolerance` / `sum_matches` |
-| `severity` | `high`, `medium`, or `low` |
-
-Swap the file to change the rules — no code change needed.
+### Scenario B: In-Workflow Browser Extension & Pre-Submission Guard
+1. Open `http://localhost:3001/demo-form`.
+2. Click **"⚡ Load Flawed Sample"**.
+3. Click the Tasdeeq extension icon in your browser toolbar.
+4. Click **"🔍 Inspect Page Form"** — all visible fields are instantly captured into the extension.
+5. Click **"🛡️ Verify Entries"** — the extension calls the verification engine, highlights flagged inputs in red on the webpage, and displays blocking findings.
+6. Attempt to click **"🚀 Submit Voucher to Accounting"** on the webpage — the in-page **Pre-Submission Guard halts submission** with a blocking alert!
+7. Resolve or accept the exceptions inside the extension or click **"↗ Open in Full Tasdeeq Workspace"** to sync the session to the main workspace.
 
 ---
 
-## Key dependencies
+## Quality Gate States
 
-| Package | Version | Purpose |
+| State | Condition | Downstream Action |
 |---|---|---|
-| `next` | 15.x | App framework (App Router) |
-| `@google/genai` | 2.x | Official Google GenAI JavaScript SDK |
-| `zod` | 3.x | Runtime schema validation |
-| `typescript` | 5.x | Type safety |
+| `not_checked` | Data has not been verified | Submission blocked by guard |
+| `checking` | Pipeline executing | In-progress spinner |
+| `blocked` | Open blocking rule violations exist | **Release strictly forbidden** |
+| `needs_review` | Open contextual warnings or suspicions | Review recommended before sign-off |
+| `ready_for_release` | All blocking findings resolved | Authorized for downstream release |
+| `released` | Released with cryptographic seal | Verified audit record generated |
 
 ---
-
-## What's next (roadmap)
-
-- PHP version checker (stretch goal): upload a hosting panel screenshot → Gemma extracts the PHP version → code compares against patched versions for CVE-2026-109618 and CVE-2026-109619 → explains next steps in plain language.
-- Multi-page ledger support (batch images)
-- Urdu OCR improvement via prompt tuning
-- CSV import for typed entries (alongside the editable table)
-
----
-
-## Submission
-
-**Event:** Hacktoberfest Hack Day Faisalabad 2026  
-**Challenges:** Best Open-Source AI Project · Best Use of Gemma 4  
-**Team:** Tayyab
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).  
-Gemma 4 model is licensed under [Apache 2.0](https://ai.google.dev/gemma/terms).
+MIT License. Designed and engineered for the Hacktoberfest Hack Day & Open-Source AI Challenge.

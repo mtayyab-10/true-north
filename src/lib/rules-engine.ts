@@ -1,158 +1,50 @@
-﻿import type { ExtractionResult, TypedEntry, Finding, Rule, Severity } from "./types";
-import rulesRaw from "../../data/rules.json";
+import type { ExtractionResult, TypedEntry, Finding, FindingStatus } from "./types";
+import { runDeterministicChecks, evaluateQualityGate } from "./verification-engine";
 
-const rules: Rule[] = (rulesRaw as { rules: Rule[] }).rules;
-
-function numericStr(s: string): number | null {
-  const n = parseFloat(s.replace(/[,،\s]/g, "").replace(/[^0-9.\-]/g, ""));
-  return isNaN(n) ? null : n;
-}
-
-function confidence(docVal: string | number | undefined): Finding["confidence"] {
-  if (docVal === undefined || docVal === null || docVal === "") return "low";
-  if (typeof docVal === "number") return "high";
-  if (docVal.toString().trim().length > 0) return "high";
-  return "medium";
-}
-
-let findingCounter = 0;
-function newId() {
-  return `F${String(++findingCounter).padStart(3, "0")}`;
-}
-
-// ── Core check dispatch ───────────────────────────────────────────────────────
-function runCheck(
-  rule: Rule,
-  typedVal: string,
-  docVal: string,
-  evidence: string,
-  conf: Finding["confidence"]
-): Finding | null {
-  let mismatch = false;
-
-  switch (rule.check_type) {
-    case "equals":
-      mismatch = typedVal.trim() !== docVal.trim();
-      break;
-    case "equals_ci":
-      mismatch = typedVal.trim().toLowerCase() !== docVal.trim().toLowerCase();
-      break;
-    case "within_tolerance": {
-      const t = numericStr(typedVal);
-      const d = numericStr(docVal);
-      if (t === null || d === null) mismatch = true;
-      else mismatch = Math.abs(t - d) > (rule.tolerance ?? 0);
-      break;
-    }
-    case "sum_matches": {
-      const t = numericStr(typedVal);
-      const d = numericStr(docVal);
-      if (t === null || d === null) mismatch = true;
-      else mismatch = Math.abs(t - d) > (rule.tolerance ?? 0.5);
-      break;
-    }
-    default:
-      mismatch = false;
-  }
-
-  if (!mismatch) return null;
-
-  return {
-    finding_id: newId(),
-    rule_id: rule.rule_id,
-    field: rule.field,
-    typed_value: typedVal,
-    document_value: docVal,
-    evidence,
-    confidence: conf,
-    severity: rule.severity,
-    status: "open",
-  };
-}
-
-// ── Main comparison function ──────────────────────────────────────────────────
+// ── Backward-compatible comparison function ──────────────────────────────────
 export function compareEntries(
   extraction: ExtractionResult,
   typedEntries: TypedEntry[]
 ): Finding[] {
-  findingCounter = 0;
-  const findings: Finding[] = [];
-
-  const getTyped = (field: string): TypedEntry | undefined =>
-    typedEntries.find((e) => e.field === field);
-
-  for (const rule of rules) {
-    const typed = getTyped(rule.field);
-    if (!typed) continue; // no typed entry for this field → skip
-
-    let docVal = "";
-    let evidence = "";
-
-    switch (rule.field) {
-      case "total_amount":
-        docVal = extraction.total_amount?.toString() ?? "";
-        evidence = `Document total: ${extraction.total_amount ?? "not found"}`;
-        break;
-      case "subtotal":
-      case "line_item_subtotal":
-        docVal = extraction.subtotal?.toString() ?? "";
-        evidence = `Document subtotal: ${extraction.subtotal ?? "not found"}`;
-        break;
-      case "invoice_number":
-        docVal = extraction.invoice_number ?? "";
-        evidence = `Invoice # on document: ${extraction.invoice_number ?? "not found"}`;
-        break;
-      case "vendor_name":
-        docVal = extraction.vendor_name ?? "";
-        evidence = `Vendor on document: ${extraction.vendor_name ?? "not found"}`;
-        break;
-      case "date":
-        docVal = extraction.date ?? "";
-        evidence = `Date on document: ${extraction.date ?? "not found"}`;
-        break;
-      case "quantity": {
-        // match first line item quantity
-        const qty = extraction.line_items?.[0]?.quantity;
-        docVal = qty?.toString() ?? "";
-        evidence = `Quantity on first line item: ${qty ?? "not found"}`;
-        break;
-      }
-      case "unit_price": {
-        const up = extraction.line_items?.[0]?.unit_price;
-        docVal = up?.toString() ?? "";
-        evidence = `Unit price on first line item: ${up ?? "not found"}`;
-        break;
-      }
-      default:
-        continue;
-    }
-
-    const conf = confidence(docVal);
-    const finding = runCheck(rule, typed.typed_value, docVal, evidence, conf);
-    if (finding) findings.push(finding);
-  }
-
-  return findings;
+  return runDeterministicChecks(typedEntries, extraction);
 }
 
-// ── Resolution helper ─────────────────────────────────────────────────────────
+// ── Enhanced Resolution helper with reasons and audit trail ──────────────────
 export function resolveFinding(
   finding: Finding,
-  resolution: "accepted_doc" | "kept_typed" | "edited",
-  editedValue?: string
+  resolution: FindingStatus,
+  editedValue?: string,
+  reason?: string
 ): Finding {
+  let finalVal = finding.typed_value;
+  if (resolution === "accepted_doc" || resolution === "resolved_accepted") {
+    finalVal = finding.document_value || finding.expected_value || finding.typed_value;
+  } else if (resolution === "edited" || resolution === "resolved_corrected") {
+    finalVal = editedValue ?? finding.typed_value;
+  } else if (resolution === "dismissed") {
+    finalVal = finding.typed_value;
+  }
+
+  const newAudit = {
+    status: resolution,
+    timestamp: new Date().toISOString(),
+    reason: reason || (resolution === "accepted_doc" ? "Adopted document value" : resolution === "dismissed" ? "Dismissed as false positive or non-issue" : "Corrected value"),
+    previous_value: finding.typed_value,
+    resolved_value: finalVal,
+  };
+
+  const auditHistory = finding.audit_trail ? [...finding.audit_trail, newAudit] : [newAudit];
+
   return {
     ...finding,
     status: resolution,
-    resolved_value:
-      resolution === "accepted_doc"
-        ? finding.document_value
-        : resolution === "kept_typed"
-        ? finding.typed_value
-        : editedValue ?? finding.typed_value,
+    resolved_value: finalVal,
+    resolution_reason: reason,
+    audit_trail: auditHistory,
   };
 }
 
 export function allResolved(findings: Finding[]): boolean {
-  return findings.every((f) => f.status !== "open");
+  const gate = evaluateQualityGate(findings);
+  return gate.gateState === "ready_for_release";
 }

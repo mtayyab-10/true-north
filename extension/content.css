@@ -1,0 +1,98 @@
+/* ══════════════════════════════════════════════
+   TASDEEQ BROWSER EXTENSION — IN-PAGE STYLES
+   ══════════════════════════════════════════════ */
+
+.tasdeeq-highlight-blocking {
+  outline: 2px solid #f7574f !important;
+  box-shadow: 0 0 10px rgba(247, 87, 79, 0.5) !important;
+  background-color: rgba(247, 87, 79, 0.05) !important;
+  transition: all 0.25s ease !important;
+}
+
+.tasdeeq-highlight-warning {
+  outline: 2px solid #f7a94f !important;
+  box-shadow: 0 0 10px rgba(247, 169, 79, 0.5) !important;
+  background-color: rgba(247, 169, 79, 0.05) !important;
+  transition: all 0.25s ease !important;
+}
+
+.tasdeeq-field-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 4px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  z-index: 99999;
+  animation: tasdeeqFadeIn 0.3s ease;
+}
+
+.tasdeeq-field-badge--blocking {
+  background: #2a1111;
+  color: #ff7b72;
+  border: 1px solid #f7574f;
+}
+
+.tasdeeq-field-badge--warning {
+  background: #2a2011;
+  color: #f7a94f;
+  border: 1px solid #f7a94f;
+}
+
+.tasdeeq-guard-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #161a26;
+  color: #e8ecf4;
+  border: 2px solid #f7574f;
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 380px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 2147483647;
+  font-family: system-ui, -apple-system, sans-serif;
+  animation: tasdeeqSlideUp 0.3s ease;
+}
+
+.tasdeeq-guard-toast__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #f7574f;
+  margin-bottom: 6px;
+}
+
+.tasdeeq-guard-toast__body {
+  font-size: 12px;
+  color: #8896b3;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.tasdeeq-guard-toast__btn {
+  background: #4f6ef7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@keyframes tasdeeqFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tasdeeqSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
