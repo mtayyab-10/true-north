@@ -100,14 +100,31 @@ truenorth/
 
 ---
 
-## How Gemma 4 is Integrated
+## Open-Source AI & Model Verification (Challenge Compliance)
 
-Gemma 4 (`gemma-4-26b-a4b-it`) serves three distinct, high-impact roles:
-1. **Multimodal Visual Extraction (`/api/extract`)**: Interprets images of handwritten and printed bills, returning structured line items, subtotals, taxes, and vendor data.
-2. **Contextual Reasoning & Anomaly Detection (`/api/verify`)**: Analyzes the submitted transaction against business domain and contextual parameters. Identifies semantic anomalies that hardcoded rules cannot detect without promoting mere suspicions to errors.
-3. **Plain-Language Executive Summary (`/api/summarize`)**: Synthesizes open and resolved issues into concise, non-technical plain-language summaries for auditors and department heads.
+TrueNorth fulfills the **Hacktoberfest MLH Open-Source AI Prize Challenge** requirements through an open-weight multimodal foundation model paired with an original verification engine harness.
 
-*Security Guarantee:* The Gemini API key remains strictly on the server (`process.env.gemini_api_key`) and is never bundled in client-side code or the browser extension.
+| Requirement | Project Verification | Direct Link |
+|---|---|---|
+| **Open-Source Project License** | Permissive OSI-approved open-source license | [MIT License](LICENSE) |
+| **Open-Weight Model Name** | `Gemma 4 26B A4B IT` (`gemma-4-26b-a4b-it`) | [Gemma Overview](https://ai.google.dev/gemma) |
+| **Model Classification** | Open-Weight Large Language Model (26B parameters, multimodal) | [Google DeepMind Gemma](https://ai.google.dev/gemma) |
+| **Model Terms & License** | Google Gemma Terms of Use | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
+| **Model Harness / Pipeline** | Original 4-tier verification engine + browser extension pre-submission guard | [`src/lib/verification-engine.ts`](src/lib/verification-engine.ts) |
+| **Key Dependencies** | `@google/genai` (Apache-2.0), `next` (MIT), `zod` (MIT) | [`package.json`](package.json) |
+
+### AI Technology Contribution & Relevant Code (in Plain Language)
+
+Gemma 4 is integrated strictly on the server side across three high-impact verification roles:
+
+1. **Multimodal Document Extraction ([`src/app/api/extract/route.ts`](src/app/api/extract/route.ts))**:
+   - *Plain-Language Contribution*: Interprets messy photos of handwritten or printed bills/invoices (supporting mixed English and Urdu labels) and structures them into verified JSON (vendor, invoice number, line items, subtotals, taxes, totals) without needing a third-party proprietary OCR service.
+2. **Contextual Reasoning & Anomaly Detection ([`src/lib/verification-engine.ts`](src/lib/verification-engine.ts) & [`src/app/api/verify/route.ts`](src/app/api/verify/route.ts))**:
+   - *Plain-Language Contribution*: Acts as an intelligent context checker. While ordinary deterministic code checks arithmetic (`qty × price = total`), Gemma 4 inspects semantic domain mismatches (e.g., medical pharmacy ordering industrial raw materials, or currency conflicts) and flags them as contextual suspicions for human review.
+3. **Plain-Language Bilingual Executive Summary ([`src/app/api/summarize/route.ts`](src/app/api/summarize/route.ts))**:
+   - *Plain-Language Contribution*: Synthesizes complex findings into concise, readable summaries in either English or Urdu (اردو) for shop owners, bookkeepers, and auditors.
+
+*Security Guarantee:* The Gemini API key remains strictly on the server (`process.env.gemini_api_key`) and is never exposed to the client-side DOM or browser extension.
 
 ---
 
@@ -119,8 +136,8 @@ Gemma 4 (`gemma-4-26b-a4b-it`) serves three distinct, high-impact roles:
 
 ### 1. Run the Web Workspace
 ```bash
-git clone https://github.com/YOUR_USERNAME/truenorth.git
-cd truenorth
+git clone https://github.com/mtayyab-10/true-north.git
+cd true-north
 npm install
 ```
 

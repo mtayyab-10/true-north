@@ -1,52 +1,50 @@
-﻿# OrganizerHQ Submission Text — Tasdeeq
+# OrganizerHQ Submission Text — TrueNorth (Tasdeeq تصدیق)
 
 ## Project Name
-Tasdeeq (تصدیق)
+TrueNorth (Tasdeeq تصدیق)
 
 ## One-line Description
-AI-powered document verification that catches typing errors in handwritten bills
-and invoices before they cost small businesses money — powered by Gemma 4.
+Context-aware pre-submission quality gate and browser extension that catches clerical blunders, arithmetic mismatches, and data anomalies before database entry — powered by Gemma 4.
 
 ## Full Description (paste into OrganizerHQ)
-Small shop owners in Pakistan keep handwritten ledgers, bills and invoices,
-then retype the numbers into a spreadsheet by hand. Digit transpositions and
-wrong totals go unnoticed until they cause a real financial loss.
+Clerical errors, wrong totals, digit transpositions, and contextual outliers cost businesses real money when committed into accounting software, ERPs, or ledgers. 
 
-Tasdeeq (Urdu for "verification") closes that gap in four steps:
+TrueNorth (Tasdeeq) acts as an intelligent pre-submission quality gate that catches incorrect data *before* it is saved. It follows the core principle:
+"Ordinary code for certainty. Statistics for signals. An agent for context. Human review for accountability."
 
-1. UPLOAD — The user uploads a photo of a bill, ledger or invoice.
-   English and Urdu labels are both supported.
+It delivers two synchronized interfaces powered by a unified 4-tier verification engine:
 
-2. EXTRACT — Gemma 4 (gemma-4-26b-a4b-it, 26B parameter open-weight model)
-   reads the image through the Gemini API and returns structured JSON:
-   vendor name, invoice number, date, line items, subtotals and totals.
+1. MAIN WEB WORKSPACE:
+   - Upload handwritten/printed bill or invoice photos (English & Urdu labels supported).
+   - Multimodal Gemma 4 (gemma-4-26b-a4b-it, 26B open-weight LLM) extracts structured line items, subtotals, and totals.
+   - Deterministic rules test arithmetic (qty × unit_price = total), mandatory fields, date validity, and document discrepancies.
+   - Gemma 4 analyzes semantic context (e.g. pharmacy ordering industrial rebar) and flags suspicions without false blocking.
+   - Interactive review with visual evidence, 1-click document adoption, and business justification notes.
+   - Poka-Yoke Quality Gate prevents data export until all blocking violations are resolved, producing cryptographically signed release certificates and CSV/JSON audit logs.
+   - Gemma 4 generates executive summaries in plain English or Urdu (اردو).
 
-3. COMPARE — Plain code (not the model) compares the extracted values against
-   the user's typed entries using a swappable rules.json file.
-   Each rule has a rule_id, field, check type, tolerance and severity.
-   The model never decides what is a mismatch. Code does.
-
-4. RESOLVE & EXPORT — Each finding shows the field, the typed value, what
-   the document says, the evidence, confidence and severity.
-   The user resolves each one: accept document value, keep typed value, or edit.
-   The export gate releases a verified CSV only when every finding is resolved.
-   Gemma also writes a short plain-language summary in English or Urdu.
-
-What makes this different from a standard OCR pipeline: Gemma's multimodal
-capability handles handwritten Urdu and English labels on the same document,
-in one shot, without a separate OCR service. The model does the reading;
-code does all the checking.
+2. CHROMIUM BROWSER EXTENSION (Manifest V3):
+   - Inspects live web forms across third-party accounting and ERP portals.
+   - Highlights flagged inputs directly in the page DOM (red glow for blocking errors, amber for suspicions).
+   - In-Page Pre-Submission Guard intercepts form submission buttons if unresolved blocking errors exist.
+   - One-click session transfer into the full Web Workspace.
 
 ## Technologies
-- Gemma 4 26B A4B IT (gemma-4-26b-a4b-it) via Gemini API
-- @google/genai (official Google GenAI JavaScript SDK)
-- Next.js 15 (App Router) + TypeScript
-- Zod (runtime schema validation)
-- Vanilla CSS (custom dark design system)
-- MIT License (project code); Apache 2.0 (Gemma model)
+- Gemma 4 26B A4B IT (`gemma-4-26b-a4b-it`, 26B Open-Weight LLM by Google)
+- Google GenAI SDK (`@google/genai`)
+- Next.js 15 (App Router) + React 19 + TypeScript
+- Manifest V3 Browser Extension (Chrome / Edge)
+- Zod (Runtime schema validation)
+- Custom Vanilla CSS Design System
+- Open-Source MIT License (Project) & Google Gemma Terms of Use (Model)
 
 ## GitHub Repository
-[Add your GitHub repo URL here]
+https://github.com/mtayyab-10/true-north
+
+## Open-Weight Model Verification
+- Model Name: Gemma 4 26B A4B IT (gemma-4-26b-a4b-it)
+- Model Terms & License: https://ai.google.dev/gemma/terms
+- DeepMind Gemma Overview: https://ai.google.dev/gemma
 
 ## Challenges to tick
 - [x] Best Open-Source AI Project
