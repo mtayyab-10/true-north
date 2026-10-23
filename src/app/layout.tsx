@@ -1,14 +1,19 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Tasdeeq — Document Verification for Small Businesses",
+  title: "TrueNorth | Catch the wrong number before it is saved",
   description:
-    "Catch typing mistakes in ledger entries before they cost money. Upload a photo of a bill or invoice and let Gemma 4 read the numbers for you.",
-  keywords: ["document verification", "invoice", "ledger", "small business", "Urdu", "Gemma", "AI"],
+    "A pre-submission quality gate before the database. TrueNorth checks context, shows evidence, and gives analysts a clear decision before data is accepted.",
+  keywords: ["TrueNorth", "data quality", "pre-submission gate", "financial QA", "invoice verification", "Gemma 4"],
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/icon.svg",
+  },
   openGraph: {
-    title: "Tasdeeq — Document Verification",
-    description: "AI-powered verification for handwritten bills and invoices",
+    title: "TrueNorth | Catch the wrong number before it is saved",
+    description: "A pre-submission QA layer for financial and commercial data.",
     type: "website",
   },
 };
@@ -20,6 +25,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+      </head>
       <body>
         {children}
       </body>

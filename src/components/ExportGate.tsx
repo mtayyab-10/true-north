@@ -38,7 +38,7 @@ export default function ExportGate({
     gateState = "needs_review";
   }
 
-  // ── Execute Server-side Quality Gate Release ──────────────────────────────
+  // Execute Server-side Quality Gate Release
   const handleRelease = async () => {
     setIsReleasing(true);
     setErrorMsg(null);
@@ -70,7 +70,7 @@ export default function ExportGate({
     }
   };
 
-  // ── Download Verified CSV ─────────────────────────────────────────────────
+  // Download Verified CSV
   const downloadCSV = () => {
     const rows = [
       ["field", "typed_value", "resolved_value", "status", "category", "audit_reason"],
@@ -91,19 +91,19 @@ export default function ExportGate({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tasdeeq_verified_${Date.now()}.csv`;
+    a.download = `truenorth_verified_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // ── Download Full Audit JSON ──────────────────────────────────────────────
+  // Download Full Audit JSON
   const downloadJSON = () => {
     const bundle = {
       release_record: releaseRecord,
       verified_entries: typedEntries,
       audit_findings: findings,
       context,
-      verified_by: "Tasdeeq Pre-Submission Quality Engine (v1.0)",
+      verified_by: "TrueNorth Pre-Submission Quality Engine",
     };
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
       type: "application/json",
@@ -111,7 +111,7 @@ export default function ExportGate({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tasdeeq_release_${releaseRecord?.release_id || Date.now()}.json`;
+    a.download = `truenorth_release_${releaseRecord?.release_id || Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -120,11 +120,13 @@ export default function ExportGate({
     <div className={`quality-gate-panel quality-gate-panel--${gateState} animate-in`}>
       {/* Quality Gate Status Header */}
       <div className="quality-gate-header">
-        <div className="quality-gate-icon">
-          {gateState === "released" && "🛡️"}
-          {gateState === "ready_for_release" && "🔓"}
-          {gateState === "needs_review" && "⚖️"}
-          {gateState === "blocked" && "🛑"}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "var(--r-md)", background: gateState === "released" || gateState === "ready_for_release" ? "var(--accent-dim)" : "rgba(196, 93, 62, 0.12)", color: gateState === "released" || gateState === "ready_for_release" ? "var(--accent)" : "var(--sev-high)" }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2">
+            {gateState === "released" && <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>}
+            {gateState === "ready_for_release" && <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>}
+            {gateState === "needs_review" && <circle cx="12" cy="12" r="10"></circle>}
+            {gateState === "blocked" && <circle cx="12" cy="12" r="10"></circle>}
+          </svg>
         </div>
         <div>
           <div className="quality-gate-status-title">
@@ -156,8 +158,8 @@ export default function ExportGate({
       )}
 
       {errorMsg && (
-        <div className="gate-alert gate-alert--error">
-          ⚠️ <strong>Server Rejection:</strong> {errorMsg}
+        <div className="gate-alert gate-alert--blocked">
+          <strong>Server Rejection:</strong> {errorMsg}
         </div>
       )}
 
@@ -165,7 +167,7 @@ export default function ExportGate({
       {releaseRecord && (
         <div className="release-certificate animate-in">
           <div className="cert-header">
-            <span>✅ Official Tasdeeq Quality Seal</span>
+            <span>Official TrueNorth Quality Seal</span>
             <span className="cert-hash">SHA-256: {releaseRecord.verification_checksum.slice(0, 16)}…</span>
           </div>
           <div className="cert-body">
@@ -186,7 +188,7 @@ export default function ExportGate({
       )}
 
       {/* Action Buttons */}
-      <div className="quality-gate-actions">
+      <div className="quality-gate-actions" style={{ marginTop: "16px" }}>
         {gateState !== "released" ? (
           <button
             className={`btn btn--lg ${
@@ -199,16 +201,16 @@ export default function ExportGate({
             {isReleasing
               ? "Verifying Server Quality Gate…"
               : gateState === "blocked"
-              ? "🔒 Release Blocked by Quality Gate"
-              : "🚀 Authorize & Release Data"}
+              ? "Release Blocked by Quality Gate"
+              : "Authorize & Release Data"}
           </button>
         ) : (
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button className="btn btn--primary" onClick={downloadCSV} id="btn-download-csv">
-              ⬇ Download Verified CSV
+              Download Verified CSV
             </button>
             <button className="btn btn--secondary" onClick={downloadJSON} id="btn-download-json">
-              📄 Download Audit Bundle (JSON)
+              Download Audit Bundle (JSON)
             </button>
           </div>
         )}

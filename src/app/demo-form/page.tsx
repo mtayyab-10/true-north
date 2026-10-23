@@ -168,12 +168,10 @@ export default function ControlledDemoFormPage() {
       <header className="topbar">
         <div className="topbar__brand">
           <div className="topbar__logo">
-            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <span style={{ fontWeight: 800, fontSize: "16px", color: "var(--accent-text)" }}>T</span>
           </div>
           <div>
-            <div className="topbar__title">Tasdeeq</div>
+            <div className="topbar__title">TrueNorth</div>
             <div className="topbar__sub">Controlled Form &amp; Pre-Submission Guard Demo</div>
           </div>
         </div>
@@ -193,23 +191,27 @@ export default function ControlledDemoFormPage() {
           {/* Extension Integration Banner */}
           <div className="guard-banner animate-in">
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "24px" }}>🔌</span>
+              <div style={{ width: "32px", height: "32px", borderRadius: "var(--r-md)", background: "var(--accent-dim)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                </svg>
+              </div>
               <div>
                 <strong style={{ color: "var(--text-primary)" }}>Browser Extension Target Page</strong>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0 }}>
-                  This form is instrumented for both in-page Pre-Submission Guarding and the Tasdeeq Browser Extension.
+                  This form is instrumented for in-page Pre-Submission Guarding and the TrueNorth Browser Extension.
                 </p>
               </div>
             </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button className="btn btn--ghost btn--sm" onClick={loadFlawedSample}>
-                ⚡ Load Flawed Sample
+                Load Flawed Sample
               </button>
               <button className="btn btn--ghost btn--sm" onClick={loadOutlierSample}>
-                🔍 Load Outlier Sample
+                Load Outlier Sample
               </button>
               <button className="btn btn--ghost btn--sm" onClick={loadCleanSample}>
-                ✓ Load Clean Sample
+                Load Clean Sample
               </button>
             </div>
           </div>
@@ -218,9 +220,9 @@ export default function ControlledDemoFormPage() {
           <div className="demo-form-card animate-in">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
               <div>
-                <h1 style={{ fontSize: "20px", fontWeight: 700 }}>Supplier Payable Voucher Submission</h1>
+                <h1 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)" }}>Supplier Payable Voucher Submission</h1>
                 <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                  Enterprise ERP & Ledger Ingestion Portal (Controlled Demonstration Form)
+                  Enterprise ERP &amp; Ledger Ingestion Portal (Controlled Demonstration Form)
                 </p>
               </div>
               <button
@@ -229,7 +231,7 @@ export default function ControlledDemoFormPage() {
                 disabled={isVerifying}
                 id="btn-inspect-page"
               >
-                {isVerifying ? "Verifying with Tasdeeq…" : "🛡️ Verify Form with Tasdeeq"}
+                {isVerifying ? "Verifying with TrueNorth…" : "Verify Form with TrueNorth"}
               </button>
             </div>
 
@@ -245,13 +247,24 @@ export default function ControlledDemoFormPage() {
                 }`}
                 style={{ marginBottom: "20px" }}
               >
-                <span style={{ fontSize: "18px" }}>
-                  {verificationResult.gateState === "blocked"
-                    ? "🛑"
-                    : verificationResult.gateState === "needs_review"
-                    ? "⚖️"
-                    : "✅"}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "24px", height: "24px" }}>
+                  {verificationResult.gateState === "blocked" ? (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                    </svg>
+                  ) : verificationResult.gateState === "needs_review" ? (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  )}
+                </div>
                 <div style={{ flex: 1 }}>
                   <strong>
                     {verificationResult.gateState === "blocked"
@@ -430,7 +443,7 @@ export default function ControlledDemoFormPage() {
                   className="btn btn--primary btn--lg"
                   id="btn-submit-external"
                 >
-                  🚀 Submit Voucher to Accounting
+                  Submit Voucher to Accounting
                 </button>
               </div>
             </form>
@@ -438,9 +451,13 @@ export default function ControlledDemoFormPage() {
             {/* Submission Successful State */}
             {submissionSuccess && (
               <div className="alert alert--info animate-in" style={{ marginTop: "20px" }}>
-                <span>🎉</span>
+                <div style={{ width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
                 <div>
-                  <strong>Voucher Successfully Ingested!</strong>
+                  <strong>Voucher Successfully Ingested</strong>
                   <p style={{ margin: 0, fontSize: "12px" }}>
                     The transaction conformed to all quality policies and was committed to the database.
                   </p>
@@ -459,7 +476,8 @@ export default function ControlledDemoFormPage() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(0,0,0,0.8)",
+              background: "rgba(28, 27, 25, 0.65)",
+              backdropFilter: "blur(4px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -471,29 +489,34 @@ export default function ControlledDemoFormPage() {
               className="animate-in"
               style={{
                 background: "var(--bg-surface)",
-                border: "2px solid #f7574f",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--r-xl)",
                 maxWidth: "540px",
                 width: "100%",
                 padding: "28px",
-                boxShadow: "0 0 40px rgba(247,87,79,0.3)",
+                boxShadow: "var(--shadow-lg)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <span style={{ fontSize: "36px" }}>🛑</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "var(--r-md)", background: "rgba(196, 93, 62, 0.12)", color: "var(--sev-high)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                  </svg>
+                </div>
                 <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#f7574f" }}>
-                    Tasdeeq Pre-Submission Guard
+                  <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
+                    TrueNorth Pre-Submission Guard
                   </h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0 }}>
+                  <p style={{ fontSize: "12px", color: "var(--sev-high)", fontWeight: 600, margin: 0 }}>
                     Submission Intercepted — Critical Quality Gate Enforcement
                   </p>
                 </div>
               </div>
 
-              <p style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "16px" }}>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px", lineHeight: "1.5" }}>
                 {!verificationResult
-                  ? "This record has not been verified through Tasdeeq. Policy requires pre-submission verification to catch clerical and numerical errors."
+                  ? "This record has not been verified through TrueNorth. Policy requires pre-submission verification to catch clerical and numerical discrepancies."
                   : `Release held: ${
                       verificationResult.findings.filter(
                         (f) => (f.severity === "blocking" || f.severity === "high") && f.status === "open"
@@ -506,8 +529,9 @@ export default function ControlledDemoFormPage() {
                   style={{
                     maxHeight: "180px",
                     overflowY: "auto",
-                    background: "rgba(0,0,0,0.3)",
-                    padding: "10px",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
+                    padding: "12px",
                     borderRadius: "var(--r-md)",
                     marginBottom: "16px",
                     fontSize: "12px",
@@ -516,11 +540,11 @@ export default function ControlledDemoFormPage() {
                   {verificationResult.findings
                     .filter((f) => f.status === "open")
                     .map((f) => (
-                      <div key={f.finding_id} style={{ marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "6px" }}>
-                        <strong style={{ color: f.severity === "blocking" || f.severity === "high" ? "#f7574f" : "#f7a94f" }}>
+                      <div key={f.finding_id} style={{ marginBottom: "8px", borderBottom: "1px solid var(--border)", paddingBottom: "6px" }}>
+                        <strong style={{ color: f.severity === "blocking" || f.severity === "high" ? "var(--sev-high)" : "var(--sev-med)" }}>
                           [{f.category.replace("_", " ").toUpperCase()}] {f.field}:
                         </strong>{" "}
-                        {f.evidence}
+                        <span style={{ color: "var(--text-primary)" }}>{f.evidence}</span>
                       </div>
                     ))}
                 </div>
@@ -540,7 +564,7 @@ export default function ControlledDemoFormPage() {
                     runVerification();
                   }}
                 >
-                  🛡️ Run Full Verification Now
+                  Run Full Verification Now
                 </button>
               </div>
             </div>

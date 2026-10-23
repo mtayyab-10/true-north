@@ -13,9 +13,9 @@ interface Props {
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  vendor_name: "Vendor / Supplier Name",
-  invoice_number: "Invoice / Bill Number",
-  date: "Transaction Date",
+  vendor_name: "Vendor Name",
+  invoice_number: "Invoice Number",
+  date: "Date",
   total_amount: "Total Amount",
   quantity: "Quantity",
   unit_price: "Unit Price",
@@ -27,29 +27,25 @@ const FIELD_LABELS: Record<string, string> = {
 
 const CATEGORY_META: Record<
   FindingCategory,
-  { label: string; icon: string; badgeCls: string; description: string }
+  { label: string; badgeCls: string; description: string }
 > = {
   rule_violation: {
     label: "Rule Violation",
-    icon: "🛑",
     badgeCls: "badge--violation",
     description: "Deterministic check established a defined rule failure.",
   },
   contextual_suspicion: {
     label: "Contextual Suspicion",
-    icon: "🔍",
     badgeCls: "badge--suspicion",
     description: "AI or statistical benchmark signal identified an anomaly.",
   },
   uncertain_extraction: {
     label: "Uncertain Extraction",
-    icon: "⚠️",
     badgeCls: "badge--uncertain",
     description: "Value cannot be read or verified with high visual confidence.",
   },
   missing_context: {
     label: "Missing Context",
-    icon: "❓",
     badgeCls: "badge--missing",
     description: "Essential business or reporting context is missing.",
   },
@@ -62,7 +58,7 @@ function StatusBadge({ status }: { status: FindingStatus }) {
     accepted_doc: { cls: "status-resolved", label: "Used Document Value" },
     resolved_corrected: { cls: "status-resolved", label: "Corrected Value" },
     edited: { cls: "status-resolved", label: "Corrected Value" },
-    kept_typed: { cls: "status-resolved", label: "Kept Typed Value" },
+    kept_typed: { cls: "status-resolved", label: "Kept Value" },
     dismissed: { cls: "status-dismissed", label: "Dismissed" },
   };
   const item = map[status] || { cls: "status-open", label: status };
@@ -89,19 +85,19 @@ function FindingItem({
 
   return (
     <div
-      className={`finding-card finding-card--${finding.severity} ${
-        isResolved ? "finding-card--resolved" : ""
-      } animate-in`}
+      className={`finding-card ${
+        isBlocking ? "finding-card--blocking" : "finding-card--warning"
+      } ${isResolved ? "finding-card--resolved" : ""} animate-in`}
       id={`card-${finding.finding_id}`}
     >
       <div className="finding-card__top">
-        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span className={`category-pill ${cat.badgeCls}`}>
-              {cat.icon} {cat.label}
+              {cat.label}
             </span>
             <span className={`sev-chip sev-chip--${finding.severity}`}>
-              {isBlocking ? "Blocking" : finding.severity}
+              {isBlocking ? "Blocking" : "Warning"}
             </span>
           </div>
           <div className="finding-card__field">
@@ -116,16 +112,16 @@ function FindingItem({
 
       {/* Values Comparison Grid */}
       <div className="finding-card__values">
-        <div className="value-box value-box--typed">
+        <div className="value-box">
           <div className="value-box__label">Observed / Submitted Value</div>
           <div className="value-box__val">{finding.typed_value || "—"}</div>
         </div>
         {(finding.document_value || finding.expected_value) && (
-          <div className="value-box value-box--doc">
+          <div className="value-box">
             <div className="value-box__label">
-              {finding.document_value ? "Document / Scan Reference" : "Expected Calculated Value"}
+              {finding.document_value ? "Document / Scan Reference" : "Expected Value"}
             </div>
-            <div className="value-box__val">
+            <div className="value-box__val" style={{ color: "var(--accent)" }}>
               {finding.document_value || finding.expected_value}
             </div>
           </div>
@@ -144,7 +140,7 @@ function FindingItem({
         )}
         {finding.suggested_action && (
           <div className="action-body">
-            <strong>Recommended Next Step:</strong> {finding.suggested_action}
+            <strong>Action:</strong> {finding.suggested_action}
           </div>
         )}
       </div>
@@ -166,12 +162,12 @@ function FindingItem({
                 }
                 id={`btn-adopt-doc-${finding.finding_id}`}
               >
-                ✓ Adopt Document Value ({finding.document_value})
+                Adopt Document Value ({finding.document_value})
               </button>
             )}
 
             <button
-              className="btn btn--primary btn--sm"
+              className="btn btn--secondary btn--sm"
               onClick={() => {
                 setShowEdit(!showEdit);
                 setShowAccept(false);
@@ -179,7 +175,7 @@ function FindingItem({
               }}
               id={`btn-edit-${finding.finding_id}`}
             >
-              ✏ Correct Value
+              Correct Value
             </button>
 
             <button
@@ -191,7 +187,7 @@ function FindingItem({
               }}
               id={`btn-accept-exc-${finding.finding_id}`}
             >
-              ⚖ Accept as Legitimate Exception
+              Accept Exception
             </button>
 
             {!isBlocking && (
@@ -204,7 +200,7 @@ function FindingItem({
                 }}
                 id={`btn-dismiss-${finding.finding_id}`}
               >
-                ✕ Dismiss with Note
+                Dismiss
               </button>
             )}
           </div>
@@ -212,14 +208,14 @@ function FindingItem({
           {/* Edit Value Form */}
           {showEdit && (
             <div className="resolution-form animate-in">
-              <label className="resolution-form__label">Enter verified corrected value:</label>
+              <label className="resolution-form__label">Corrected Value:</label>
               <div style={{ display: "flex", gap: "8px" }}>
                 <input
                   className="table-input"
                   type="text"
                   value={editVal}
                   onChange={(e) => setEditVal(e.target.value)}
-                  placeholder="e.g. 50400"
+                  placeholder="Enter corrected value"
                   id={`input-correct-${finding.finding_id}`}
                 />
                 <button
@@ -236,7 +232,7 @@ function FindingItem({
                   }}
                   id={`btn-save-edit-${finding.finding_id}`}
                 >
-                  Save & Resolve
+                  Save
                 </button>
               </div>
             </div>
@@ -254,7 +250,7 @@ function FindingItem({
                   type="text"
                   value={reasonVal}
                   onChange={(e) => setReasonVal(e.target.value)}
-                  placeholder="e.g. Special negotiated bulk discount approved by procurement"
+                  placeholder="e.g. Special negotiated bulk discount approved"
                   id={`input-reason-accept-${finding.finding_id}`}
                 />
                 <button
@@ -287,7 +283,7 @@ function FindingItem({
                   type="text"
                   value={reasonVal}
                   onChange={(e) => setReasonVal(e.target.value)}
-                  placeholder="e.g. Expected variation or seasonal adjustment"
+                  placeholder="e.g. Non-critical variation"
                   id={`input-reason-dismiss-${finding.finding_id}`}
                 />
                 <button
@@ -317,7 +313,7 @@ function FindingItem({
         <div className="resolved-summary">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-              Resolved as: <strong>{finding.resolved_value || finding.typed_value}</strong>
+              Resolved as: <strong style={{ color: "var(--accent)" }}>{finding.resolved_value || finding.typed_value}</strong>
               {finding.resolution_reason && (
                 <span style={{ marginLeft: "6px", color: "var(--text-muted)" }}>
                   — &quot;{finding.resolution_reason}&quot;
@@ -325,29 +321,26 @@ function FindingItem({
               )}
             </span>
             <button
-              className="btn-link"
               onClick={() => setShowAuditTrail(!showAuditTrail)}
-              style={{ fontSize: "12px", color: "var(--accent-primary)", background: "none", border: "none", cursor: "pointer" }}
+              style={{ fontSize: "12px", color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
             >
               {showAuditTrail ? "Hide Audit History" : "View Audit History"}
             </button>
           </div>
 
           {showAuditTrail && (
-            <div className="audit-trail-box animate-in">
-              <div style={{ fontWeight: 600, marginBottom: "4px" }}>Resolution Audit History:</div>
+            <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--border)", fontSize: "11px", color: "var(--text-muted)" }}>
+              <div style={{ fontWeight: 600, marginBottom: "4px" }}>Audit History:</div>
               {finding.audit_trail && finding.audit_trail.length > 0 ? (
                 finding.audit_trail.map((entry: any, i: number) => (
-                  <div key={i} className="audit-entry">
+                  <div key={i} style={{ padding: "2px 0" }}>
                     <span>{new Date(entry.timestamp).toLocaleTimeString()}</span> ·{" "}
                     <strong>{entry.status}</strong>: {entry.reason || "Updated"}{" "}
                     (Value: {entry.resolved_value})
                   </div>
                 ))
               ) : (
-                <div className="audit-entry">
-                  {finding.resolution_reason || "Resolved by user review."}
-                </div>
+                <div>{finding.resolution_reason || "Resolved by reviewer."}</div>
               )}
             </div>
           )}
@@ -377,11 +370,12 @@ export default function FindingsPanel({ findings, onResolve }: Props) {
 
   if (findings.length === 0) {
     return (
-      <div className="findings-empty animate-in">
-        <div className="findings-empty__icon">✨</div>
-        <div className="findings-empty__title">No Discrepancies Detected</div>
-        <div className="findings-empty__text">
-          All entries conform to deterministic checks, statistical benchmarks, and contextual validation.
+      <div style={{ textAlign: "center", padding: "32px 16px", background: "var(--bg-elevated)", borderRadius: "var(--r-md)" }}>
+        <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--accent)", marginBottom: "4px" }}>
+          No Discrepancies Detected
+        </div>
+        <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+          All entries conform to deterministic checks, statistical baselines, and contextual validation.
         </div>
       </div>
     );
@@ -409,7 +403,7 @@ export default function FindingsPanel({ findings, onResolve }: Props) {
               }`}
               onClick={() => setActiveFilter(catKey)}
             >
-              {meta.icon} {meta.label} ({count})
+              {meta.label} ({count})
             </button>
           );
         })}

@@ -88,7 +88,10 @@ function applyHighlights(findings) {
         const badge = document.createElement("div");
         badge.className = "tasdeeq-field-badge " + (isBlocking ? "tasdeeq-field-badge--blocking" : "tasdeeq-field-badge--warning");
         badge.setAttribute("data-tasdeeq-badge", "true");
-        badge.innerHTML = "<span>" + (isBlocking ? "🛑" : "⚠️") + "</span> <span>" + (f.evidence || f.label || "Issue detected") + "</span>";
+        const iconSvg = isBlocking
+          ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:middle;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        badge.innerHTML = iconSvg + " <span>" + (f.evidence || f.label || "Issue detected") + "</span>";
         el.parentNode.insertBefore(badge, el.nextSibling);
       }
     });
@@ -112,7 +115,8 @@ function showGuardToast(blockingCount, sampleEvidence) {
   toast.className = "tasdeeq-guard-toast";
   toast.innerHTML = [
     '<div class="tasdeeq-guard-toast__title">',
-    '  <span>🛑</span> Tasdeeq Pre-Submission Guard',
+    '  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+    '  <span>TrueNorth Pre-Submission Guard</span>',
     '</div>',
     '<div class="tasdeeq-guard-toast__body">',
     '  Submission blocked: <strong>' + blockingCount + ' blocking issue(s)</strong> must be resolved before this form can be submitted.',

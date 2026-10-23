@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tasdeeq Quality Gate</title>
+  <title>TrueNorth Quality Gate</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
       <div class="header__brand">
         <div class="logo">T</div>
         <div>
-          <div class="title">Tasdeeq</div>
+          <div class="title">TrueNorth</div>
           <div class="subtitle">Pre-Submission Quality Gate</div>
         </div>
       </div>
@@ -43,16 +43,21 @@
     <!-- Main Actions -->
     <div class="action-bar">
       <button id="btn-inspect" class="btn btn--secondary btn--sm">
-        🔍 Inspect Form
+        Inspect Form
       </button>
       <button id="btn-verify" class="btn btn--primary btn--sm" disabled>
-        🛡️ Verify Entries
+        Verify Entries
       </button>
     </div>
 
     <!-- Quality Gate Banner -->
     <div id="gate-banner" class="gate-banner gate-banner--hidden">
-      <div class="gate-banner__icon" id="gate-icon">🛑</div>
+      <div class="gate-banner__icon" id="gate-icon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+        </svg>
+      </div>
       <div class="gate-banner__text">
         <div class="gate-banner__title" id="gate-title">Quality Gate Active</div>
         <div class="gate-banner__sub" id="gate-sub">Inspecting data…</div>
@@ -79,7 +84,7 @@
     <!-- Footer / Workspace Link -->
     <footer class="footer">
       <button id="btn-open-workspace" class="btn btn--ghost btn--full">
-        ↗ Open in Full Web Workspace
+        Open Full Web Workspace →
       </button>
     </footer>
   </div>

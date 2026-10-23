@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       chrome.tabs.sendMessage(tab.id, { action: "INSPECT_PAGE" }, (response) => {
         btnInspect.disabled = false;
-        btnInspect.innerText = "🔍 Inspect Form";
+        btnInspect.innerText = "Inspect Form";
 
         if (!response || !response.fields || response.fields.length === 0) {
           alert("No form inputs found on this page. Navigate to a supported form (e.g. http://localhost:3001/demo-form).");
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     } catch (err) {
       btnInspect.disabled = false;
-      btnInspect.innerText = "🔍 Inspect Form";
+      btnInspect.innerText = "Inspect Form";
       alert("Could not inspect page: " + err.message);
     }
   });
@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Verification error: " + err.message);
     } finally {
       btnVerify.disabled = false;
-      btnVerify.innerText = "🛡️ Verify Entries";
+      btnVerify.innerText = "Verify Entries";
     }
   });
 
@@ -160,17 +160,17 @@ function renderQualityGate(gateState, stats, summary) {
 
   if (gateState === "blocked") {
     banner.classList.add("gate-banner--blocked");
-    icon.innerText = "🛑";
+    icon.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`;
     title.innerText = `Quality Gate: Blocked (${stats.blocking} Errors)`;
     sub.innerText = "Blocking errors prevent form submission.";
   } else if (gateState === "needs_review") {
     banner.classList.add("gate-banner--review");
-    icon.innerText = "⚖️";
+    icon.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
     title.innerText = `Quality Gate: Needs Review (${stats.warnings} Warnings)`;
     sub.innerText = "Review warnings before release.";
   } else {
     banner.classList.add("gate-banner--ready");
-    icon.innerText = "✅";
+    icon.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
     title.innerText = "Quality Gate: Clear for Release";
     sub.innerText = "All data conforms to verification rules.";
   }
@@ -185,7 +185,7 @@ function renderFindingsList(findings) {
   listEl.innerHTML = "";
 
   if (findings.length === 0) {
-    listEl.innerHTML = `<div style="font-size:12px; color:#4ff7a9; padding:8px 0;">✓ All checks passed. Zero discrepancies detected.</div>`;
+    listEl.innerHTML = `<div style="font-size:12px; color:var(--sev-ok); padding:8px 0; font-weight:600;">All checks passed. Zero discrepancies detected.</div>`;
     return;
   }
 
@@ -202,7 +202,7 @@ function renderFindingsList(findings) {
     card.innerHTML = `
       <div class="finding-mini-top">
         <span>${f.label || f.field}</span>
-        <span style="color:${isBlocking ? "#f7574f" : "#f7a94f"}; font-size:10px; font-weight:700;">
+        <span style="color:${isBlocking ? "var(--sev-blocking)" : "var(--sev-warning)"}; font-size:10px; font-weight:700;">
           ${f.category.replace(/_/g, " ").toUpperCase()}
         </span>
       </div>
@@ -214,19 +214,19 @@ function renderFindingsList(findings) {
           ${
             hasFixValue
               ? `<button class="btn btn--primary btn-mini" data-action="autofix" data-id="${f.finding_id}" data-field="${f.field}" data-val="${fixVal}">
-                  ✓ Fix on Form (${fixVal})
+                  Fix on Form (${fixVal})
                 </button>`
               : ""
           }
           <button class="btn btn--secondary btn-mini" data-action="accept" data-id="${f.finding_id}">
-            ✓ Accept
+            Accept
           </button>
           <button class="btn btn--ghost btn-mini" data-action="dismiss" data-id="${f.finding_id}">
-            ✕ Dismiss
+            Dismiss
           </button>
         </div>
       `
-          : `<div style="color:#4ff7a9; font-size:10px;">✓ Resolved: ${f.status}</div>`
+          : `<div style="color:var(--sev-ok); font-size:10px; font-weight:600;">Resolved: ${f.status}</div>`
       }
     `;
 

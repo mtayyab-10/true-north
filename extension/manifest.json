@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tasdeeq — Pre-Submission Quality Gate",
+  "name": "TrueNorth — Pre-Submission Quality Gate",
   "version": "1.0.0",
   "description": "Context-aware data verification and pre-submission quality gate powered by Gemma 4.",
   "icons": {
