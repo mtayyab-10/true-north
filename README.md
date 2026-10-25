@@ -93,7 +93,13 @@ truenorth/
 │       └── ExportGate.tsx         ← Quality gate card enforcing release policies
 │
 ├── data/
-│   └── rules.json                 ← Configurable business rules & statistical baselines
+│   ├── rules.json                 ← Reference business rules & threshold definitions
+│   └── php-versions.json          ← Security version baselines & advisory references
+├── demo-samples/
+│   ├── demo_typed_entries.csv     ← Sample voucher data with intentional errors for testing
+│   └── README.txt                 ← Instructions for physical document test samples
+├── public/
+│   └── favicon.svg                ← Application favicon
 ├── test-suite.mjs                 ← Automated verification engine unit test suite
 └── package.json
 ```
